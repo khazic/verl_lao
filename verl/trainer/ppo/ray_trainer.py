@@ -820,7 +820,7 @@ class RayPPOTrainer:
 
                 self.config.reward_model.n_gpus_per_node = self.config.trainer.n_gpus_per_node
                 resource_pool = self.resource_pool_manager.get_resource_pool(Role.RewardModel)
-                self.reward_loop_manager = RewardLoopManager(
+                self.reward_loop_manager = RewardLoopManager.create(
                     config=self.config,
                     rm_resource_pool=resource_pool,
                 )
@@ -909,7 +909,7 @@ class RayPPOTrainer:
         else:
             rm_resource_pool = None
 
-        self.async_rollout_manager = AgentLoopManager(
+        self.async_rollout_manager = AgentLoopManager.create(
             config=self.config,
             worker_group=self.actor_rollout_wg,
             rollout_resource_pool=actor_rollout_resource_pool,
@@ -1648,7 +1648,11 @@ class RayPPOTrainer:
                     if esi_close_to_expiration:
                         print("Force saving checkpoint: ESI instance expiration approaching.")
                     with marked_timer("save_checkpoint", timing_raw, color="green"):
+                        # sleep replicas to avoid OOM during checkpoint saving
+                        self.checkpoint_manager.sleep_replicas()
                         self._save_checkpoint()
+                        # wake replicas to avoid OOM during checkpoint saving
+                        self.checkpoint_manager.update_weights()
 
                 with marked_timer("stop_profile", timing_raw):
                     next_step_profile = (
