@@ -11,7 +11,7 @@ ENTRYPOINT=${ENTRYPOINT:-"-m verl.trainer.main_ppo"}
 TRAIN_FILES=${TRAIN_FILES:-/mnt/data/liuchonghan/vmlu_dataset/all_data_merged_rlhf.json}
 MODEL_ID=${MODEL_ID:-/mnt/data/liuchonghan/75_0129_ckpt3000}
 PROJECT_NAME=${PROJECT_NAME:-rlvr}
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-rlvr_72b_grpo_megatron}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-rlvr_72b_grpo_fsdp}
 
 NNODES=${PET_NNODES:-${WORLD_SIZE:-28}}
 NODE_RANK=${PET_NODE_RANK:-${RANK:-0}}
@@ -19,8 +19,11 @@ MASTER_ADDR=${PET_MASTER_ADDR:-${MASTER_ADDR:-"127.0.0.1"}}
 MASTER_PORT=${PET_MASTER_PORT:-${MASTER_PORT:-23457}}
 N_GPUS_PER_NODE=${PET_NPROC_PER_NODE:-${NPROC_PER_NODE:-${N_GPUS_PER_NODE:-8}}}
 
-TP_SIZE=${TP_SIZE:-8}
-PP_SIZE=${PP_SIZE:-1}
+FSDP_STRATEGY=${FSDP_STRATEGY:-fsdp2}
+FSDP_SIZE=${FSDP_SIZE:-8}
+ACTOR_OFFLOAD=${ACTOR_OFFLOAD:-False}
+REF_OFFLOAD=${REF_OFFLOAD:-False}
+CRITIC_OFFLOAD=${CRITIC_OFFLOAD:-False}
 
 rollout_mode=${ROLLOUT_MODE:-async}
 USE_FUSED_KERNELS=${USE_FUSED_KERNELS:-True}
@@ -43,7 +46,7 @@ fi
 sleep 5
 
 python3 $ENTRYPOINT --config-path=/mnt/data/liuchonghan/verl_lao/verl/trainer/config \
-    --config-name='ppo_megatron_trainer.yaml' \
+    --config-name='ppo_trainer.yaml' \
     algorithm.adv_estimator=grpo \
     data.train_files=$TRAIN_FILES \
     data.val_files=$TRAIN_FILES \
@@ -56,24 +59,30 @@ python3 $ENTRYPOINT --config-path=/mnt/data/liuchonghan/verl_lao/verl/trainer/co
     data.truncation='error' \
     actor_rollout_ref.model.path=$MODEL_ID \
     actor_rollout_ref.model.use_fused_kernels=$USE_FUSED_KERNELS \
+    actor_rollout_ref.actor.strategy=$FSDP_STRATEGY \
+    actor_rollout_ref.actor.fsdp_config.fsdp_size=$FSDP_SIZE \
+    actor_rollout_ref.actor.fsdp_config.param_offload=$ACTOR_OFFLOAD \
+    actor_rollout_ref.actor.fsdp_config.optimizer_offload=$ACTOR_OFFLOAD \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.actor.ppo_mini_batch_size=224 \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1 \
-    actor_rollout_ref.actor.megatron.pipeline_model_parallel_size=$PP_SIZE \
-    actor_rollout_ref.actor.megatron.tensor_model_parallel_size=$TP_SIZE \
     actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.actor.kl_loss_coef=0.0 \
     actor_rollout_ref.actor.kl_loss_type=low_var_kl \
     actor_rollout_ref.actor.entropy_coeff=0 \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
-    actor_rollout_ref.rollout.tensor_model_parallel_size=$TP_SIZE \
+    actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.mode=$rollout_mode \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.4 \
     actor_rollout_ref.rollout.n=16 \
+    actor_rollout_ref.ref.fsdp_config.fsdp_size=$FSDP_SIZE \
+    actor_rollout_ref.ref.fsdp_config.param_offload=$REF_OFFLOAD \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1 \
-    actor_rollout_ref.ref.megatron.pipeline_model_parallel_size=$PP_SIZE \
-    actor_rollout_ref.ref.megatron.tensor_model_parallel_size=$TP_SIZE \
+    critic.strategy=$FSDP_STRATEGY \
+    critic.model.fsdp_config.fsdp_size=$FSDP_SIZE \
+    critic.model.fsdp_config.param_offload=$CRITIC_OFFLOAD \
+    critic.model.fsdp_config.optimizer_offload=$CRITIC_OFFLOAD \
     algorithm.use_kl_in_reward=False \
     trainer.critic_warmup=0 \
     trainer.logger='["console","wandb"]' \
