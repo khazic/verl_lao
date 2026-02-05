@@ -4,6 +4,7 @@ set -xeuo pipefail
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export VLLM_USE_V1=1
 export VERL_USE_GPT_OSS=0
+export WANDB_MODE=offline
 export PYTHONPATH=/llm-align/liuchonghan/verl_lao:${PYTHONPATH:-}
 
 ENTRYPOINT=${ENTRYPOINT:-"-m verl.trainer.main_ppo"}
@@ -12,7 +13,6 @@ MODEL_ID=${MODEL_ID:-/llm-align/liuchonghan/Qwen3-8B}
 PROJECT_NAME=${PROJECT_NAME:-rlvr_8b}
 EXPERIMENT_NAME=${EXPERIMENT_NAME:-rlvr_8b_grpo_megatron_single}
 
-# Single node, 8 GPUs
 NNODES=1
 NODE_RANK=0
 MASTER_ADDR=127.0.0.1
