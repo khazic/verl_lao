@@ -28,6 +28,7 @@ CRITIC_OFFLOAD=${CRITIC_OFFLOAD:-False}
 rollout_mode=${ROLLOUT_MODE:-async}
 USE_FUSED_KERNELS=${USE_FUSED_KERNELS:-True}
 RETURN_RAW_CHAT=${RETURN_RAW_CHAT:-True}
+RAY_ADDRESS=${RAY_ADDRESS:-auto}
 
 python3 $ENTRYPOINT --config-path=/llm-align/liuchonghan/verl_lao/verl/trainer/config \
     --config-name='ppo_trainer.yaml' \
@@ -80,6 +81,6 @@ python3 $ENTRYPOINT --config-path=/llm-align/liuchonghan/verl_lao/verl/trainer/c
     trainer.save_freq=300 \
     trainer.test_freq=300 \
     trainer.total_epochs=5 \
-    +ray_kwargs.ray_init.num_cpus=32 \
+    +ray_kwargs.ray_init.address=$RAY_ADDRESS \
     custom_reward_function.path=/llm-align/liuchonghan/verl_lao/recipes_custom/RLVR_ABCDE_dense/reward_function.py \
     custom_reward_function.name=char_count_reward_function
