@@ -13,9 +13,9 @@ MODEL_ID=${MODEL_ID:-/llm-align/liuchonghan/Qwen3-8B}
 PROJECT_NAME=${PROJECT_NAME:-rlvr_8b}
 EXPERIMENT_NAME=${EXPERIMENT_NAME:-rlvr_8b_grpo_megatron_single}
 
-NNODES=1
-NODE_RANK=0
-MASTER_ADDR=127.0.0.1
+NNODES=${NNODES:-4}
+NODE_RANK=${NODE_RANK:-0}
+MASTER_ADDR=${MASTER_ADDR:-10.178.170.212}
 MASTER_PORT=${MASTER_PORT:-23457}
 N_GPUS_PER_NODE=${N_GPUS_PER_NODE:-8}
 
@@ -56,6 +56,7 @@ python3 $ENTRYPOINT --config-path=/llm-align/liuchonghan/verl_lao/verl/trainer/c
     actor_rollout_ref.rollout.gpu_memory_utilization=0.30 \
     actor_rollout_ref.rollout.n=2 \
     actor_rollout_ref.rollout.max_num_batched_tokens=4096 \
+    actor_rollout_ref.rollout.max_model_len=8192 \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.ref.megatron.pipeline_model_parallel_size=$PP_SIZE \
     actor_rollout_ref.ref.megatron.tensor_model_parallel_size=$TP_SIZE \
