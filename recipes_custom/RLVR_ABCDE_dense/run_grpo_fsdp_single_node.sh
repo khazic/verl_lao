@@ -24,6 +24,8 @@ TRAIN_FILES=${TRAIN_FILES:-/llm-align/liuchonghan/all_data_merged_rlhf.json}
 MODEL_ID=${MODEL_ID:-/llm-align/liuchonghan/Qwen3-8B}
 PROJECT_NAME=${PROJECT_NAME:-rlvr_8b}
 EXPERIMENT_NAME=${EXPERIMENT_NAME:-rlvr_8b_grpo_fsdp_single}
+# 与 Megatron 一致：多节点时 checkpoint 需写共享目录，用绝对路径
+DEFAULT_LOCAL_DIR=${DEFAULT_LOCAL_DIR:-/llm-align/liuchonghan/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}}
 
 NNODES=${NNODES:-4}
 NODE_RANK=${NODE_RANK:-0}
@@ -45,6 +47,8 @@ RAY_WORKING_DIR=${RAY_WORKING_DIR:-/llm-align/liuchonghan/verl_lao}
 ACTOR_LR=${ACTOR_LR:-1e-6}
 MIN_LR=${MIN_LR:-1e-7}
 LR_DECAY_STYLE=${LR_DECAY_STYLE:-cosine}
+# 与 Megatron 一致，消融实验用同一显存占用
+GPU_MEMORY_UTILIZATION=${GPU_MEMORY_UTILIZATION:-0.35}
 
 python3 $ENTRYPOINT --config-path=/llm-align/liuchonghan/verl_lao/verl/trainer/config \
     --config-name='ppo_trainer.yaml' \
@@ -77,7 +81,7 @@ python3 $ENTRYPOINT --config-path=/llm-align/liuchonghan/verl_lao/verl/trainer/c
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.mode=$rollout_mode \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.35 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=$GPU_MEMORY_UTILIZATION \
     actor_rollout_ref.rollout.n=16 \
     actor_rollout_ref.rollout.max_num_batched_tokens=10384 \
     actor_rollout_ref.rollout.max_model_len=2048 \
@@ -93,6 +97,7 @@ python3 $ENTRYPOINT --config-path=/llm-align/liuchonghan/verl_lao/verl/trainer/c
     trainer.logger='["console","wandb"]' \
     trainer.project_name=$PROJECT_NAME \
     trainer.experiment_name=$EXPERIMENT_NAME \
+    trainer.default_local_dir=$DEFAULT_LOCAL_DIR \
     trainer.val_before_train=True \
     trainer.n_gpus_per_node=$N_GPUS_PER_NODE \
     trainer.nnodes=$NNODES \
