@@ -13,8 +13,8 @@ export https_proxy=${https_proxy:-$WANDB_PROXY_URL}
 export PYTHONPATH=/llm-align/liuchonghan/verl_lao:${PYTHONPATH:-}
 export GLOO_SOCKET_IFNAME=${GLOO_SOCKET_IFNAME:-eth0}
 export NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME:-eth0}
-export RAY_TMPDIR=/llm-align/liuchonghan/r
-export TMPDIR=/llm-align/liuchonghan/tmp
+export RAY_TMPDIR=/dev/shm/ray
+export TMPDIR=/dev/shm/tmp
 
 ENTRYPOINT=${ENTRYPOINT:-"-m verl.trainer.main_ppo"}
 TRAIN_FILES=${TRAIN_FILES:-/llm-align/liuchonghan/all_data_merged_rlhf.json}
