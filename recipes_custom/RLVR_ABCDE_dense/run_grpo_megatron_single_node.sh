@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 set -xeuo pipefail
 
-unset RAYLET_SOCKET_NAME
-unset PLASMA_STORE_SOCKET_NAME
-unset RAY_SESSION_DIR
-
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export VLLM_USE_V1=1
 export VERL_USE_GPT_OSS=0
@@ -38,7 +34,7 @@ PP_SIZE=1
 rollout_mode=${ROLLOUT_MODE:-async}
 USE_FUSED_KERNELS=${USE_FUSED_KERNELS:-True}
 RETURN_RAW_CHAT=${RETURN_RAW_CHAT:-True}
-RAY_ADDRESS=${RAY_ADDRESS:-auto}
+RAY_ADDRESS=${RAY_ADDRESS:-10.178.170.212:6379}
 RAY_WORKING_DIR=${RAY_WORKING_DIR:-/llm-align/liuchonghan/verl_lao}
 ACTOR_LR=${ACTOR_LR:-1e-6}
 MIN_LR=${MIN_LR:-1e-7}
@@ -98,7 +94,7 @@ python3 $ENTRYPOINT --config-path=/llm-align/liuchonghan/verl_lao/verl/trainer/c
     +ray_kwargs.ray_init.runtime_env.working_dir=$RAY_WORKING_DIR \
     +ray_kwargs.ray_init.runtime_env.env_vars.PYTHONPATH=$RAY_WORKING_DIR:${PYTHONPATH:-} \
     +ray_kwargs.ray_init.runtime_env.env_vars.MASTER_ADDR=$MASTER_ADDR \
-    +ray_kwargs.ray_init.runtime_env.env_vars.MASTER_PORT=\"$MASTER_PORT\" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.MASTER_PORT=$MASTER_PORT \
     +ray_kwargs.ray_init.runtime_env.env_vars.NCCL_SOCKET_IFNAME=$NCCL_SOCKET_IFNAME \
     +ray_kwargs.ray_init.runtime_env.env_vars.GLOO_SOCKET_IFNAME=$GLOO_SOCKET_IFNAME \
     +ray_kwargs.ray_init.runtime_env.env_vars.WANDB_MODE=$WANDB_MODE \
