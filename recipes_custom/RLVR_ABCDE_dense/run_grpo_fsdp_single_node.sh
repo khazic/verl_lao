@@ -24,7 +24,6 @@ TRAIN_FILES=${TRAIN_FILES:-/llm-align/liuchonghan/all_data_merged_rlhf.json}
 MODEL_ID=${MODEL_ID:-/llm-align/liuchonghan/Qwen3-8B}
 PROJECT_NAME=${PROJECT_NAME:-rlvr_8b}
 EXPERIMENT_NAME=${EXPERIMENT_NAME:-rlvr_8b_grpo_fsdp_single}
-# 与 Megatron 一致：多节点时 checkpoint 需写共享目录，用绝对路径
 DEFAULT_LOCAL_DIR=${DEFAULT_LOCAL_DIR:-/llm-align/liuchonghan/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}}
 
 NNODES=${NNODES:-4}
@@ -47,7 +46,6 @@ RAY_WORKING_DIR=${RAY_WORKING_DIR:-/llm-align/liuchonghan/verl_lao}
 ACTOR_LR=${ACTOR_LR:-1e-6}
 MIN_LR=${MIN_LR:-1e-7}
 LR_DECAY_STYLE=${LR_DECAY_STYLE:-cosine}
-# 与 Megatron 一致，消融实验用同一显存占用
 GPU_MEMORY_UTILIZATION=${GPU_MEMORY_UTILIZATION:-0.35}
 
 python3 $ENTRYPOINT --config-path=/llm-align/liuchonghan/verl_lao/verl/trainer/config \
@@ -104,6 +102,7 @@ python3 $ENTRYPOINT --config-path=/llm-align/liuchonghan/verl_lao/verl/trainer/c
     trainer.save_freq=300 \
     trainer.test_freq=300 \
     trainer.total_epochs=5 \
+    +ray_kwargs.ray_init._temp_dir=$RAY_TMPDIR \
     +ray_kwargs.ray_init.address=$RAY_ADDRESS \
     +ray_kwargs.ray_init.runtime_env.working_dir=$RAY_WORKING_DIR \
     +ray_kwargs.ray_init.runtime_env.env_vars.PYTHONPATH=$RAY_WORKING_DIR:${PYTHONPATH:-} \
