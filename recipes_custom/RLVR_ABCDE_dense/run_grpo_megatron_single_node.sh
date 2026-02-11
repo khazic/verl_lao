@@ -7,14 +7,17 @@ export VERL_USE_GPT_OSS=0
 export WANDB_MODE=${WANDB_MODE:-online}
 export WANDB_DIR=${WANDB_DIR:-/llm-align/liuchonghan/wandb}
 export WANDB_PROXY_URL=${WANDB_PROXY_URL:-'http://yuhaiqiang:%7Bs%23fwCGAdJTQnFyE@proxy.ops.qihoo.net:8000'}
-export HTTP_PROXY=${HTTP_PROXY:-$WANDB_PROXY_URL}
-export HTTPS_PROXY=${HTTPS_PROXY:-$WANDB_PROXY_URL}
-export http_proxy=${http_proxy:-$WANDB_PROXY_URL}
-export https_proxy=${https_proxy:-$WANDB_PROXY_URL}
-export ALL_PROXY=${ALL_PROXY:-$WANDB_PROXY_URL}
-export all_proxy=${all_proxy:-$WANDB_PROXY_URL}
+# Force proxy vars for this job (base images often preset `http_proxy` / `no_proxy`).
+export HTTP_PROXY="$WANDB_PROXY_URL"
+export HTTPS_PROXY="$WANDB_PROXY_URL"
+export http_proxy="$WANDB_PROXY_URL"
+export https_proxy="$WANDB_PROXY_URL"
+export ALL_PROXY="$WANDB_PROXY_URL"
+export all_proxy="$WANDB_PROXY_URL"
+
+# Ensure internal traffic never goes through the proxy.
 export NO_PROXY=${NO_PROXY:-"localhost,127.0.0.1,::1,10.,172.16.,172.17.,172.18.,172.19.,192.168.,.svc,.cluster.local,.hbox-aigc.svc"}
-export no_proxy=${no_proxy:-"$NO_PROXY"}
+export no_proxy="$NO_PROXY"
 export PYTHONPATH=/llm-align/liuchonghan/verl_lao:${PYTHONPATH:-}
 export GLOO_SOCKET_IFNAME=${GLOO_SOCKET_IFNAME:-eth0}
 export GLOO_IPV6=${GLOO_IPV6:-"0"}
