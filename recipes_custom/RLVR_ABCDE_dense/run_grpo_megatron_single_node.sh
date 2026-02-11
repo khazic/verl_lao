@@ -4,13 +4,11 @@ set -xeuo pipefail
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export VLLM_USE_V1=1
 export VERL_USE_GPT_OSS=0
-export WANDB_MODE=${WANDB_MODE:-online}
+export WANDB_MODE=${WANDB_MODE:-offline}
 export WANDB_DIR=${WANDB_DIR:-/llm-align/liuchonghan/wandb}
-export WANDB_PROXY_URL=${WANDB_PROXY_URL:-'http://yuhaiqiang:%7Bs%23fwCGAdJTQnFyE@proxy.ops.qihoo.net:8000'}
-export HTTP_PROXY=${HTTP_PROXY:-$WANDB_PROXY_URL}
-export HTTPS_PROXY=${HTTPS_PROXY:-$WANDB_PROXY_URL}
-export http_proxy=${http_proxy:-$WANDB_PROXY_URL}
-export https_proxy=${https_proxy:-$WANDB_PROXY_URL}
+# Proxy is disabled by default. If you need it temporarily, set env vars
+# outside this script and remove the unsets below.
+unset WANDB_PROXY_URL HTTP_PROXY HTTPS_PROXY http_proxy https_proxy ALL_PROXY all_proxy
 export NO_PROXY=${NO_PROXY:-"localhost,127.0.0.1,::1,10.,172.16.,172.17.,172.18.,172.19.,192.168.,.svc,.cluster.local,.hbox-aigc.svc"}
 export no_proxy=${no_proxy:-"$NO_PROXY"}
 export PYTHONPATH=/llm-align/liuchonghan/verl_lao:${PYTHONPATH:-}
@@ -107,11 +105,11 @@ python3 $ENTRYPOINT --config-path=/llm-align/liuchonghan/verl_lao/verl/trainer/c
     +ray_kwargs.ray_init.runtime_env.env_vars.WANDB_MODE=$WANDB_MODE \
     +ray_kwargs.ray_init.runtime_env.env_vars.WANDB_DIR=$WANDB_DIR \
     +ray_kwargs.ray_init.runtime_env.env_vars.TMPDIR=$TMPDIR \
-    +ray_kwargs.ray_init.runtime_env.env_vars.WANDB_PROXY_URL=$WANDB_PROXY_URL \
-    +ray_kwargs.ray_init.runtime_env.env_vars.HTTP_PROXY=$HTTP_PROXY \
-    +ray_kwargs.ray_init.runtime_env.env_vars.HTTPS_PROXY=$HTTPS_PROXY \
-    +ray_kwargs.ray_init.runtime_env.env_vars.http_proxy=$http_proxy \
-    +ray_kwargs.ray_init.runtime_env.env_vars.https_proxy=$https_proxy \
+    +ray_kwargs.ray_init.runtime_env.env_vars.WANDB_PROXY_URL=\"\" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.HTTP_PROXY=\"\" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.HTTPS_PROXY=\"\" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.http_proxy=\"\" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.https_proxy=\"\" \
     +ray_kwargs.ray_init.runtime_env.env_vars.NO_PROXY=\"${NO_PROXY}\" \
     +ray_kwargs.ray_init.runtime_env.env_vars.no_proxy=\"${no_proxy}\" \
     custom_reward_function.path=/llm-align/liuchonghan/verl_lao/recipes_custom/RLVR_ABCDE_dense/reward_function.py \
