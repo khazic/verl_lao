@@ -28,7 +28,8 @@ DEFAULT_LOCAL_DIR=${DEFAULT_LOCAL_DIR:-/llm-align/liuchonghan/checkpoints/${PROJ
 
 NNODES=${NNODES:-4}
 NODE_RANK=${NODE_RANK:-0}
-MASTER_ADDR=${MASTER_ADDR:-10.178.170.212}
+# FSDP cluster: Ray head + torch master live on the FSDP master node by default.
+MASTER_ADDR=${MASTER_ADDR:-10.178.131.202}
 MASTER_PORT=${MASTER_PORT:-23457}
 N_GPUS_PER_NODE=${N_GPUS_PER_NODE:-8}
 
