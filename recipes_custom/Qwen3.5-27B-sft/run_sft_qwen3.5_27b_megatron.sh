@@ -7,8 +7,7 @@ NODE_RANK=${NODE_RANK:-0}
 MASTER_ADDR=${MASTER_ADDR:-localhost}
 MASTER_PORT=${MASTER_PORT:-29500}
 
-DATASET_DIR=${DATASET_DIR:-~/dataset}
-TRAIN_FILES=${TRAIN_FILES:-${DATASET_DIR}/train.parquet}
+TRAIN_FILES=${TRAIN_FILES:-/llm-align/liuchonghan/ins_dataset/ins_dataset/train.parquet}
 
 MODEL_PATH=${MODEL_PATH:-/llm-align/open_models/Qwen3.5/Qwen3.5-27B}
 
