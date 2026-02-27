@@ -114,4 +114,5 @@ torchrun \
     trainer.experiment_name="${exp_name}" \
     trainer.total_epochs=${TOTAL_EPOCHS} \
     trainer.default_local_dir="${ckpts_home}" \
-    trainer.resume_mode=${RESUME_MODE}
+    trainer.resume_mode=${RESUME_MODE} \
+    'checkpoint.save_contents=[model,optimizer,extra,hf_model]'
