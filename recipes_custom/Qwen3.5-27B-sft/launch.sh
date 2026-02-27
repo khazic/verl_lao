@@ -5,13 +5,13 @@
 set -euo pipefail
 
 # ============================================================
-# 修改这里：填你 4 个节点的主机名或 IP
+# 4 个节点的 IP 地址
 # ============================================================
 NODES=(
-    "h-liuchonghan-rler0224-a4nodes-m-0"
-    "h-liuchonghan-rler0224-a4nodes-w-0"
-    "h-liuchonghan-rler0224-a4nodes-w-1"
-    "h-liuchonghan-rler0224-a4nodes-w-2"
+    "10.178.129.2"
+    "10.178.128.205"
+    "10.178.162.19"
+    "10.178.160.28"
 )
 
 MASTER_ADDR=${NODES[0]}
