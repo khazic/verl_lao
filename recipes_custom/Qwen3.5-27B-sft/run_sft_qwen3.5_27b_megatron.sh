@@ -22,10 +22,13 @@ CP_SIZE=${CP_SIZE:-1}
 EP_SIZE=${EP_SIZE:-1}
 ETP_SIZE=${ETP_SIZE:-1}
 
-TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-192}
-MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-6}
-MAX_LENGTH=${MAX_LENGTH:-8192}
+TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-256}
+MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-8}
+MAX_LENGTH=${MAX_LENGTH:-6144}
+MAX_TOKEN_LEN_PER_GPU=${MAX_TOKEN_LEN_PER_GPU:-${MAX_LENGTH}}
 PAD_MODE=${PAD_MODE:-no_padding}
+TRUNCATION=${TRUNCATION:-right}
+NUM_WORKERS=${NUM_WORKERS:-16}
 LR=${LR:-5e-6}
 MIN_LR=${MIN_LR:-5e-7}
 DTYPE=${DTYPE:-bfloat16}
@@ -45,6 +48,12 @@ echo ">>> 通信信息: MASTER ${MASTER_ADDR} : ${MASTER_PORT}"
 
 if [ "${NODE_RANK}" -eq 0 ]; then
     mkdir -p "${ckpts_home}"
+fi
+
+# Qwen3.5 GDN + megatron bshd path currently requires no_padding + static bsz.
+if [ "${PAD_MODE}" != "no_padding" ]; then
+    echo "ERROR: PAD_MODE must be no_padding for Qwen3.5 megatron bshd path."
+    exit 1
 fi
 
 export WANDB_MODE=${WANDB_MODE:-offline}
@@ -98,9 +107,10 @@ torchrun \
     data.micro_batch_size_per_gpu=${MICRO_BATCH_SIZE} \
     data.max_length=${MAX_LENGTH} \
     data.pad_mode=${PAD_MODE} \
-    data.truncation=right \
+    data.truncation=${TRUNCATION} \
     data.use_dynamic_bsz=False \
-    data.max_token_len_per_gpu=${MAX_LENGTH} \
+    data.max_token_len_per_gpu=${MAX_TOKEN_LEN_PER_GPU} \
+    data.num_workers=${NUM_WORKERS} \
     data.messages_key=messages \
     model.path=${MODEL_PATH} \
     model.use_remove_padding=True \
@@ -108,7 +118,7 @@ torchrun \
     model.enable_gradient_checkpointing=True \
     ${ENGINE_CONFIG} \
     trainer.test_freq=-1 \
-    trainer.save_freq=2000 \
+    trainer.save_freq=5000 \
     trainer.max_ckpt_to_keep=3 \
     trainer.logger="['console']" \
     trainer.project_name="${project_name}" \
