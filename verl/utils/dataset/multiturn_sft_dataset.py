@@ -155,8 +155,10 @@ class MultiTurnSFTDataset(Dataset):
 
         dataframes = []
         for parquet_file in self.parquet_files:
-            # default loader loads some list as np.ndarray, which fails the tokenizer
-            dataframe = pd.read_parquet(parquet_file, dtype_backend="pyarrow")
+            # NOTE: dtype_backend="pyarrow" fails on large files with nested types
+            # (ArrowNotImplementedError: Nested data conversions not implemented for chunked array outputs)
+            # convert_nested_value_to_list_recursive handles np.ndarray -> list conversion instead
+            dataframe = pd.read_parquet(parquet_file)
             dataframes.append(dataframe)
         self.dataframe = pd.concat(dataframes)
 

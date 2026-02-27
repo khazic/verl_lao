@@ -7,7 +7,6 @@ NNODES=${WORLD_SIZE:-${NNODES:-4}}
 NODE_RANK=${RANK:-${NODE_RANK:-0}}
 MASTER_PORT=${MASTER_PORT:-8888}
 
-# 将 MASTER_ADDR 主机名解析为 IPv4，避免 IPv6 报错
 RAW_MASTER_ADDR=${MASTER_ADDR:-127.0.0.1}
 MASTER_ADDR=$(python3 -c "import socket; print(socket.getaddrinfo('${RAW_MASTER_ADDR}', None, socket.AF_INET)[0][4][0])" 2>/dev/null || echo "${RAW_MASTER_ADDR}")
 
