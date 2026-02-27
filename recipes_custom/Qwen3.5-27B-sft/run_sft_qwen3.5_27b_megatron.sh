@@ -1,11 +1,15 @@
+#!/usr/bin/env bash
 set -xeuo pipefail
 
 
 NUM_GPUS=${NUM_GPUS:-8}
-NNODES=${NNODES:-4}
-NODE_RANK=${NODE_RANK:-0}
-MASTER_ADDR=${MASTER_ADDR:-localhost}
-MASTER_PORT=${MASTER_PORT:-29500}
+NNODES=${WORLD_SIZE:-${NNODES:-4}}
+NODE_RANK=${RANK:-${NODE_RANK:-0}}
+MASTER_PORT=${MASTER_PORT:-8888}
+
+# 将 MASTER_ADDR 主机名解析为 IPv4，避免 IPv6 报错
+RAW_MASTER_ADDR=${MASTER_ADDR:-127.0.0.1}
+MASTER_ADDR=$(python3 -c "import socket; print(socket.getaddrinfo('${RAW_MASTER_ADDR}', None, socket.AF_INET)[0][4][0])" 2>/dev/null || echo "${RAW_MASTER_ADDR}")
 
 TRAIN_FILES=${TRAIN_FILES:-/llm-align/liuchonghan/ins_dataset/ins_dataset/train.parquet}
 
