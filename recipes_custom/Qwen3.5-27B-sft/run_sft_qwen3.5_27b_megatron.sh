@@ -10,7 +10,8 @@ MASTER_PORT=${MASTER_PORT:-8888}
 RAW_MASTER_ADDR=${MASTER_ADDR:-127.0.0.1}
 MASTER_ADDR=$(python3 -c "import socket; print(socket.getaddrinfo('${RAW_MASTER_ADDR}', None, socket.AF_INET)[0][4][0])" 2>/dev/null || echo "${RAW_MASTER_ADDR}")
 
-TRAIN_FILES=${TRAIN_FILES:-/llm-align/liuchonghan/ins_dataset/ins_dataset/train.parquet}
+DATA_DIR=/llm-align/liuchonghan/ins_dataset/ins_dataset
+TRAIN_FILES=${TRAIN_FILES:-"[$(ls ${DATA_DIR}/train_part*.parquet 2>/dev/null | tr '\n' ',' | sed 's/,$//')]"}
 
 MODEL_PATH=${MODEL_PATH:-/llm-align/open_models/Qwen3.5/Qwen3.5-27B}
 
@@ -88,7 +89,7 @@ torchrun \
     --master_addr=${MASTER_ADDR} \
     --master_port=${MASTER_PORT} \
     -m verl.trainer.sft_trainer \
-    data.train_files="${TRAIN_FILES}" \
+    "data.train_files=${TRAIN_FILES}" \
     data.train_batch_size=${TRAIN_BATCH_SIZE} \
     data.micro_batch_size_per_gpu=${MICRO_BATCH_SIZE} \
     data.max_length=${MAX_LENGTH} \
