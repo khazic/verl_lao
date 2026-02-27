@@ -61,7 +61,8 @@ fi
 
 export WANDB_MODE=${WANDB_MODE:-offline}
 export NCCL_DEBUG=WARN
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export PYTORCH_ALLOC_CONF=expandable_segments:True
+export HYDRA_FULL_ERROR=1
 export PYTHONPATH=${PYTHONPATH:-}:/llm-align/liuchonghan/verl_lao
 
 # Key Qwen3.5 settings:
