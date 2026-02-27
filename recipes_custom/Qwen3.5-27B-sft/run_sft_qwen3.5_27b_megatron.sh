@@ -11,17 +11,7 @@ RAW_MASTER_ADDR=${MASTER_ADDR:-127.0.0.1}
 MASTER_ADDR=$(python3 -c "import socket; print(socket.getaddrinfo('${RAW_MASTER_ADDR}', None, socket.AF_INET)[0][4][0])" 2>/dev/null || echo "${RAW_MASTER_ADDR}")
 
 DATA_DIR=/llm-align/liuchonghan/ins_dataset/ins_dataset
-
-ALL_FILES=($(ls ${DATA_DIR}/train_part*.parquet 2>/dev/null | sort))
-TOTAL_FILES=${#ALL_FILES[@]}
-FILES_PER_NODE=$(( (TOTAL_FILES + NNODES - 1) / NNODES ))
-START_IDX=$(( NODE_RANK * FILES_PER_NODE ))
-END_IDX=$(( START_IDX + FILES_PER_NODE ))
-if [ ${END_IDX} -gt ${TOTAL_FILES} ]; then
-    END_IDX=${TOTAL_FILES}
-fi
-NODE_FILES=("${ALL_FILES[@]:${START_IDX}:$((END_IDX - START_IDX))}")
-TRAIN_FILES="[$(printf '%s,' "${NODE_FILES[@]}" | sed 's/,$//')]"
+TRAIN_FILES=${TRAIN_FILES:-"[$(ls ${DATA_DIR}/train_part*.parquet 2>/dev/null | tr '\n' ',' | sed 's/,$//')]"}
 
 MODEL_PATH=${MODEL_PATH:-/llm-align/open_models/Qwen3.5/Qwen3.5-27B}
 
@@ -39,9 +29,8 @@ LR=${LR:-5e-6}
 MIN_LR=${MIN_LR:-5e-7}
 DTYPE=${DTYPE:-bfloat16}
 TOTAL_EPOCHS=${TOTAL_EPOCHS:-2}
-EFFECTIVE_EPOCHS=$(( TOTAL_EPOCHS * NNODES ))
 
-echo ">>> 数据分片: 节点 ${NODE_RANK} 加载 ${#NODE_FILES[@]}/${TOTAL_FILES} 个文件 (${START_IDX}-$((END_IDX-1))), epoch ${TOTAL_EPOCHS} -> ${EFFECTIVE_EPOCHS}"
+echo ">>> 数据文件: $(ls ${DATA_DIR}/train_part*.parquet 2>/dev/null | wc -l | tr -d ' ') 个, total_epochs=${TOTAL_EPOCHS}"
 
 BACKEND=megatron
 RESUME_MODE=${RESUME_MODE:-disable}
@@ -118,11 +107,11 @@ torchrun \
     model.enable_gradient_checkpointing=True \
     ${ENGINE_CONFIG} \
     trainer.test_freq=-1 \
-    trainer.save_freq=5000 \
+    trainer.save_freq=2000 \
     trainer.max_ckpt_to_keep=3 \
     trainer.logger="['console']" \
     trainer.project_name="${project_name}" \
     trainer.experiment_name="${exp_name}" \
-    trainer.total_epochs=${EFFECTIVE_EPOCHS} \
+    trainer.total_epochs=${TOTAL_EPOCHS} \
     trainer.default_local_dir="${ckpts_home}" \
     trainer.resume_mode=${RESUME_MODE}
