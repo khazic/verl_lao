@@ -155,8 +155,14 @@ class MultiTurnSFTDataset(Dataset):
 
         dataframes = []
         for parquet_file in self.parquet_files:
-            # default loader loads some list as np.ndarray, which fails the tokenizer
-            dataframe = pd.read_parquet(parquet_file, dtype_backend="pyarrow")
+            try:
+                # default loader loads some list as np.ndarray, which fails the tokenizer
+                dataframe = pd.read_parquet(parquet_file, dtype_backend="pyarrow")
+            except Exception:
+                # Fallback: old pyarrow versions fail on nested types with dtype_backend="pyarrow"
+                import pyarrow.parquet as _pq
+
+                dataframe = _pq.ParquetFile(parquet_file).read().to_pandas()
             dataframes.append(dataframe)
         self.dataframe = pd.concat(dataframes)
 
