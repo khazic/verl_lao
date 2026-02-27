@@ -47,6 +47,7 @@ fi
 export WANDB_MODE=${WANDB_MODE:-offline}
 export NCCL_DEBUG=WARN
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export PYTHONPATH=${PYTHONPATH:-}:/llm-align/liuchonghan/verl_lao
 
 # Key Qwen3.5 settings:
 #   engine.use_remove_padding=False   - GDN requires bshd format (no THD)
