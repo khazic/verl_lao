@@ -12,8 +12,6 @@ MASTER_ADDR=$(python3 -c "import socket; print(socket.getaddrinfo('${RAW_MASTER_
 
 DATA_DIR=/llm-align/liuchonghan/ins_dataset/ins_dataset
 
-# ---- 按节点分片数据文件，避免每个进程加载全量数据导致 CPU OOM ----
-# TP=8, PP=1 时每个节点 = 一个 DP rank，dp_size = NNODES
 ALL_FILES=($(ls ${DATA_DIR}/train_part*.parquet 2>/dev/null | sort))
 TOTAL_FILES=${#ALL_FILES[@]}
 FILES_PER_NODE=$(( (TOTAL_FILES + NNODES - 1) / NNODES ))
