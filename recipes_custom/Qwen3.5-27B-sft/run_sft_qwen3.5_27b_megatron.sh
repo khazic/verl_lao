@@ -104,7 +104,8 @@ torchrun \
     model.enable_gradient_checkpointing=True \
     ${ENGINE_CONFIG} \
     trainer.test_freq=-1 \
-    trainer.save_freq=500 \
+    trainer.save_freq=5000 \
+    trainer.max_ckpt_to_keep=3 \
     trainer.logger="['console']" \
     trainer.project_name="${project_name}" \
     trainer.experiment_name="${exp_name}" \
