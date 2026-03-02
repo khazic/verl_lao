@@ -29,7 +29,7 @@ def _patch_output_gate_slicing():
 
     def _patched_get_qkv(self, *args, **kwargs):
         result = _original_get_qkv(self, *args, **kwargs)
-        output_gate = kwargs.get("output_gate", False)
+        output_gate = args[2] if len(args) > 2 else kwargs.get("output_gate", False)
         if output_gate and isinstance(result, tuple) and len(result) == 4:
             query, key, value, gate = result
             num_query_groups = getattr(self.config, "num_query_groups", None)
