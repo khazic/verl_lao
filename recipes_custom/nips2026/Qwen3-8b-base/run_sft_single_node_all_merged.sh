@@ -118,6 +118,7 @@ echo "Launch config:"
 echo "BACKEND=${BACKEND} NNODES=${NNODES} NPROC_PER_NODE=${NPROC_PER_NODE} NODE_RANK=${NODE_RANK}"
 echo "MASTER_ADDR=${MASTER_ADDR} MASTER_PORT=${MASTER_PORT}"
 echo "TP=${TP_SIZE} PP=${PP_SIZE} CP=${CP_SIZE} USE_MBRIDGE=${USE_MBRIDGE}"
+echo "TRAIN_FILES=${TRAIN_FILES}"
 echo "TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE} MAX_TOKEN_LEN_PER_GPU=${MAX_TOKEN_LEN_PER_GPU}"
 echo "DEBUG_MODE=${DEBUG_MODE} DEBUG_SINGLE_GPU=${DEBUG_SINGLE_GPU}"
 
@@ -128,7 +129,7 @@ torchrun \
     --master_port=${MASTER_PORT} \
     --nproc-per-node=${NPROC_PER_NODE} \
     ${ENTRYPOINT} \
-    data.train_files="${TRAIN_FILES}" \
+    data.train_files=${TRAIN_FILES} \
     data.train_batch_size=${TRAIN_BATCH_SIZE} \
     data.max_length=${MAX_LENGTH} \
     data.pad_mode=${PAD_MODE} \
