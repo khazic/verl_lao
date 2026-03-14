@@ -109,7 +109,7 @@ torchrun \
     data.num_workers=${NUM_WORKERS} \
     data.messages_key=messages \
     model.path=${MODEL_ID} \
-    model.use_remove_padding=True \
+    model.use_remove_padding=False \
     model.trust_remote_code=True \
     model.enable_gradient_checkpointing=True \
     ${MEGATRON_ENGINE_CONFIG} \
