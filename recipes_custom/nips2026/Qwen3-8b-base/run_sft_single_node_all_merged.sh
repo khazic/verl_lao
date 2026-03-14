@@ -6,7 +6,7 @@ MODEL_ID=${MODEL_ID:-/llm-align/open_models/Qwen3/Qwen3-8B-Base}
 ALL_115700_DATASET=${ALL_115700_DATASET:-/llm-align/liuchonghan/ins_dataset/ins_dataset/all_115700_messages.parquet}
 TRAIN_FILES=${TRAIN_FILES:-"[/llm-align/liuchonghan/verl_parquet_merged/all_merged_to_eng.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/tulu3_34999.parquet,${ALL_115700_DATASET}]"}
 
-PROJECT_NAME=${PROJECT_NAME:-nips2026_qwen3_8b_base_sft}
+PROJECT_NAME=${PROJECT_NAME:-nips2026_qwen3_8b_base_sft_test}
 EXPERIMENT_NAME=${EXPERIMENT_NAME:-all_merged_to_eng}
 CKPT_HOME=${CKPT_HOME:-/llm-align/liuchonghan/ckpt_verl/sft/${PROJECT_NAME}/${EXPERIMENT_NAME}}
 RESUME_MODE=${RESUME_MODE:-disable}
