@@ -14,7 +14,7 @@ PARQUET_DIR=${PARQUET_DIR:-/llm-align/liuchonghan/ins_dataset/ins_dataset/parque
 TRAIN_FILES=${TRAIN_FILES:-"[${PARQUET_DIR}/indonesian__to__burmese.parquet,${PARQUET_DIR}/indonesian__to__chinese.parquet,${PARQUET_DIR}/indonesian__to__english.parquet,${PARQUET_DIR}/indonesian__to__filipino.parquet,${PARQUET_DIR}/indonesian__to__khmer.parquet,${PARQUET_DIR}/indonesian__to__lao.parquet,${PARQUET_DIR}/indonesian__to__malay.parquet,${PARQUET_DIR}/indonesian__to__tamil.parquet,${PARQUET_DIR}/indonesian__to__thai.parquet,${PARQUET_DIR}/indonesian__to__vietnamese.parquet]"}
 
 PROJECT_NAME=${PROJECT_NAME:-nips2026_qwen3_5_2b_base}
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-indonesian_to_all}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-indonesian_to_all_parquet_by_language}
 CKPT_HOME=${CKPT_HOME:-/llm-align/liuchonghan/ckpt_verl/sft/${PROJECT_NAME}/${EXPERIMENT_NAME}}
 RESUME_MODE=${RESUME_MODE:-disable}
 
