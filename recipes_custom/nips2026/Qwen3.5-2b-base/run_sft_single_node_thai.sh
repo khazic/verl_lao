@@ -11,10 +11,10 @@ MASTER_ADDR=$(python3 -c "import socket; print(socket.getaddrinfo('${RAW_MASTER_
 
 MODEL_ID=${MODEL_ID:-/llm-align/open_models/Qwen3.5/Qwen3.5-2b-Base}
 PARQUET_DIR=${PARQUET_DIR:-/llm-align/liuchonghan/ins_dataset/ins_dataset/parquet_by_language}
-TRAIN_FILES=${TRAIN_FILES:-"[${PARQUET_DIR}/lao__to__burmese.parquet,${PARQUET_DIR}/lao__to__chinese.parquet,${PARQUET_DIR}/lao__to__english.parquet,${PARQUET_DIR}/lao__to__filipino.parquet,${PARQUET_DIR}/lao__to__indonesian.parquet,${PARQUET_DIR}/lao__to__khmer.parquet,${PARQUET_DIR}/lao__to__malay.parquet,${PARQUET_DIR}/lao__to__tamil.parquet,${PARQUET_DIR}/lao__to__thai.parquet,${PARQUET_DIR}/lao__to__vietnamese.parquet]"}
+TRAIN_FILES=${TRAIN_FILES:-"[${PARQUET_DIR}/thai__to__burmese.parquet,${PARQUET_DIR}/thai__to__chinese.parquet,${PARQUET_DIR}/thai__to__english.parquet,${PARQUET_DIR}/thai__to__filipino.parquet,${PARQUET_DIR}/thai__to__indonesian.parquet,${PARQUET_DIR}/thai__to__khmer.parquet,${PARQUET_DIR}/thai__to__lao.parquet,${PARQUET_DIR}/thai__to__malay.parquet,${PARQUET_DIR}/thai__to__tamil.parquet,${PARQUET_DIR}/thai__to__vietnamese.parquet]"}
 
 PROJECT_NAME=${PROJECT_NAME:-nips2026_qwen3_5_2b_base}
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-lao_to_all}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-thai_to_all}
 CKPT_HOME=${CKPT_HOME:-/llm-align/liuchonghan/ckpt_verl/sft/${PROJECT_NAME}/${EXPERIMENT_NAME}}
 RESUME_MODE=${RESUME_MODE:-disable}
 
