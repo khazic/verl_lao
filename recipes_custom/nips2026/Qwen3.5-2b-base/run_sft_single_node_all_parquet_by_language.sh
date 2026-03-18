@@ -10,16 +10,26 @@ RAW_MASTER_ADDR=${MASTER_ADDR:-127.0.0.1}
 MASTER_ADDR=$(python3 -c "import socket; print(socket.getaddrinfo('${RAW_MASTER_ADDR}', None, socket.AF_INET)[0][4][0])" 2>/dev/null || echo "${RAW_MASTER_ADDR}")
 
 MODEL_ID=${MODEL_ID:-/llm-align/open_models/Qwen3.5/Qwen3.5-2b-Base}
-ALL_115700_DATASET=${ALL_115700_DATASET:-/llm-align/liuchonghan/ins_dataset/ins_dataset/all_115700_messages.parquet}
-TRAIN_FILES=${TRAIN_FILES:-"[/llm-align/liuchonghan/verl_parquet_merged/all_merged_to_eng.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/tulu3_34999.parquet,${ALL_115700_DATASET}]"}
+PARQUET_DIR=${PARQUET_DIR:-/llm-align/liuchonghan/ins_dataset/ins_dataset/parquet_by_language}
+TRAIN_FILES=${TRAIN_FILES:-$(PARQUET_DIR="${PARQUET_DIR}" python3 - <<'PY'
+import glob
+import os
+
+parquet_dir = os.environ["PARQUET_DIR"]
+files = sorted(glob.glob(os.path.join(parquet_dir, "*.parquet")))
+if not files:
+    raise SystemExit(f"No parquet files found under {parquet_dir}")
+print("[" + ",".join(files) + "]")
+PY
+)}
 
 PROJECT_NAME=${PROJECT_NAME:-nips2026_qwen3_5_2b_base}
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-all_merged}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-all_parquet_by_language}
 CKPT_HOME=${CKPT_HOME:-/llm-align/liuchonghan/ckpt_verl/sft/${PROJECT_NAME}/${EXPERIMENT_NAME}}
 RESUME_MODE=${RESUME_MODE:-disable}
 
 BACKEND=${BACKEND:-megatron}
-TOTAL_EPOCHS=${TOTAL_EPOCHS:-2}
+TOTAL_EPOCHS=${TOTAL_EPOCHS:-1}
 TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-256}
 MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-8}
 MAX_LENGTH=${MAX_LENGTH:-2048}
@@ -114,7 +124,7 @@ torchrun \
     model.enable_gradient_checkpointing=True \
     ${MEGATRON_ENGINE_CONFIG} \
     trainer.test_freq=-1 \
-    trainer.save_freq=500 \
+    trainer.save_freq=-1 \
     trainer.max_ckpt_to_keep=3 \
     trainer.logger="['console']" \
     trainer.project_name="${PROJECT_NAME}" \
