@@ -252,7 +252,7 @@ class MultiTurnSFTDataset(Dataset):
         Returns:
             messages: List of messages with replaced placeholder.
         """
-        messages: list = example[self.messages_key]
+        messages: list = convert_nested_value_to_list_recursive(example[self.messages_key])
         images = example[self.image_key] if self.image_key in example else []
         videos = example[self.video_key] if self.video_key in example else []
 
@@ -290,7 +290,6 @@ class MultiTurnSFTDataset(Dataset):
 
     def __getitem__(self, item):
         row_dict: dict = self.dataframe.iloc[item].to_dict()
-        row_dict = convert_nested_value_to_list_recursive(row_dict)
         messages = self._build_messages(row_dict)
         tools = self.tools[item] if self.tools is not None else None
         enable_thinking = (
