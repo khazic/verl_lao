@@ -59,8 +59,10 @@ def print_assembled_message(tokenizer, message_list, input_ids, loss_mask, attn_
     """
     Print the message after applying the chat template
     """
+    if os.getenv("VERL_DEBUG_CHAT_TEMPLATE", "0") != "1":
+        return
 
-    tokenized = tokenizer.apply_chat_template(message_list, add_generation_prompt=False, tokenize=False, tools=tools)
+    tokenized = apply_chat_template(tokenizer, message_list, add_generation_prompt=False, tokenize=False, tools=tools)
     sep = "\n\n"
     str = f"tokenized entire message:\n{tokenized}"
     str += sep
