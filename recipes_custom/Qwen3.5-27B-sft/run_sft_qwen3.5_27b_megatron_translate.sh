@@ -10,9 +10,9 @@ MASTER_PORT=${MASTER_PORT:-8888}
 RAW_MASTER_ADDR=${MASTER_ADDR:-127.0.0.1}
 MASTER_ADDR=$(python3 -c "import socket; print(socket.getaddrinfo('${RAW_MASTER_ADDR}', None, socket.AF_INET)[0][4][0])" 2>/dev/null || echo "${RAW_MASTER_ADDR}")
 
-TRAIN_FILES=${TRAIN_FILES:-"[/llm-align/liuchonghan/ins_dataset/ins_dataset/verl_parquet/Gemini3_translate_110w_1096687.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/verl_parquet/Gemini_QA_mm_92w_920623.parquet]"}
+TRAIN_FILES=${TRAIN_FILES:-"[/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-001-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-002-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-003-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-004-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-005-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-006-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-007-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-008-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-009-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-010-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-011-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/trans_multi2multi_110w_gemini25_claude_only_messages.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/zangyu_165039.parquet]"}
 
-MODEL_PATH=${MODEL_PATH:-/llm-align/liuchonghan/qwen3_5_27b_sft_global_step_8000}
+MODEL_PATH=${MODEL_PATH:-/llm-align/liuchonghan/ckpt_verl/sft/verl_sft_qwen3_5_27b_translate_0316/qwen3_5_27b-megatron-tp8-pp1-cp1/global_step_11000/huggingface}
 
 TP_SIZE=${TP_SIZE:-4}
 PP_SIZE=${PP_SIZE:-1}
@@ -23,7 +23,7 @@ ETP_SIZE=${ETP_SIZE:-1}
 
 TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-256}
 MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-8}
-MAX_LENGTH=${MAX_LENGTH:-6144}
+MAX_LENGTH=${MAX_LENGTH:-4096}
 MAX_TOKEN_LEN_PER_GPU=${MAX_TOKEN_LEN_PER_GPU:-${MAX_LENGTH}}
 PAD_MODE=${PAD_MODE:-no_padding}
 TRUNCATION=${TRUNCATION:-right}
@@ -31,15 +31,15 @@ NUM_WORKERS=${NUM_WORKERS:-1}
 LR=${LR:-5e-6}
 MIN_LR=${MIN_LR:-5e-7}
 DTYPE=${DTYPE:-bfloat16}
-TOTAL_EPOCHS=${TOTAL_EPOCHS:-2}
+TOTAL_EPOCHS=${TOTAL_EPOCHS:-1}
 
 echo ">>> 数据文件: ${TRAIN_FILES}, total_epochs=${TOTAL_EPOCHS}"
 
 BACKEND=megatron
 RESUME_MODE=${RESUME_MODE:-disable}
 
-project_name=verl_sft_qwen3_5_27b_megatron_translate
-exp_name=qwen3_5_27b_megatron_translate-${BACKEND}-tp${TP_SIZE}-pp${PP_SIZE}-cp${CP_SIZE}
+project_name=verl_sft_qwen3_5_27b_megatron_translate_0325
+exp_name=qwen3_5_27b_megatron_translate_0325-${BACKEND}-tp${TP_SIZE}-pp${PP_SIZE}-cp${CP_SIZE}
 ckpts_home=${ckpts_home:-/llm-align/liuchonghan/ckpt_verl/sft/${project_name}/${exp_name}}
 
 echo ">>> 节点信息: RANK ${NODE_RANK} / WORLD_SIZE ${NNODES}"
@@ -104,7 +104,7 @@ torchrun \
     --master_addr=${MASTER_ADDR} \
     --master_port=${MASTER_PORT} \
     -m verl.trainer.sft_trainer \
-    "data.train_files=${TRAIN_FILES}" \
+    data.train_files="${TRAIN_FILES}" \
     data.train_batch_size=${TRAIN_BATCH_SIZE} \
     data.micro_batch_size_per_gpu=${MICRO_BATCH_SIZE} \
     data.max_length=${MAX_LENGTH} \
