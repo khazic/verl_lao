@@ -61,10 +61,16 @@ class SFTTensorCollator:
 
         final_batch = {}
 
-        # Use intersection of keys so that only keys present in ALL samples are collated.
-        # This avoids batch size mismatches for optional keys (e.g., multi_modal_inputs
-        # which only exists in samples with vision inputs).
+        union_keys = set().union(*(d.keys() for d in batch))
         tensor_keys = set.intersection(*(set(d.keys()) for d in batch)) if batch else set()
+        missing_keys = union_keys - tensor_keys
+        if missing_keys:
+            raise ValueError(
+                f"Keys {missing_keys} are missing in some samples within the batch. "
+                f"Mixing samples with and without optional keys (e.g., multi_modal_inputs) "
+                f"in the same batch is not supported. Use a modal-aware batch sampler to "
+                f"ensure all samples in a batch have the same keys."
+            )
 
         # Handle tensor values by creating a NestedTensor.
         for key in tensor_keys:
