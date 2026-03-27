@@ -334,6 +334,10 @@ class MultiTurnSFTDataset(Dataset):
         for k in keys_to_remove:
             del multi_modal_inputs[k]
 
+        # mm_token_type_ids is a tokenizer artifact that marks text vs vision tokens.
+        # For text-only data it is all-zeros and not needed for training.
+        multi_modal_inputs.pop("mm_token_type_ids", None)
+
         for k, v in multi_modal_inputs.items():
             multi_modal_inputs[k] = torch.concat(v, dim=0)
 
@@ -393,7 +397,7 @@ class MultiTurnSFTDataset(Dataset):
                 "position_ids": position_ids,
                 "loss_mask": loss_mask,
             }
-            if self.processor is not None and len(multi_modal_inputs) > 0:
+            if len(multi_modal_inputs) > 0:
                 res["multi_modal_inputs"] = multi_modal_inputs
             return res
         elif self.pad_mode == DatasetPadMode.NO_PADDING:
@@ -411,7 +415,7 @@ class MultiTurnSFTDataset(Dataset):
                 "position_ids": position_ids,
                 "loss_mask": loss_mask,
             }
-            if self.processor is not None and len(multi_modal_inputs) > 0:
+            if len(multi_modal_inputs) > 0:
                 res["multi_modal_inputs"] = multi_modal_inputs
             return res
         else:
