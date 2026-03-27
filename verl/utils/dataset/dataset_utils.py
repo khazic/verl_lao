@@ -61,7 +61,9 @@ class SFTTensorCollator:
 
         final_batch = {}
 
-        tensor_keys = set().union(*(d.keys() for d in batch))
+        # Use intersection (not union) so only keys present in ALL samples are collated.
+        # This avoids KeyError when some samples have optional keys (e.g. multi_modal_inputs).
+        tensor_keys = set.intersection(*(set(d.keys()) for d in batch)) if batch else set()
 
         # Handle tensor values by creating a NestedTensor.
         for key in tensor_keys:
