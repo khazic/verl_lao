@@ -292,12 +292,18 @@ def make_megatron_module(
             # Extract TransformerConfig from the created model
             tf_config = get_model_config(model[0] if isinstance(model, list) else model)
         else:
+            # Build ddp_config dict with use_distributed_optimizer, then apply overrides
+            vanilla_ddp_config = {
+                "use_distributed_optimizer": wrap_config.use_distributed_optimizer,
+            }
+            if override_ddp_config is not None:
+                vanilla_ddp_config.update(override_ddp_config)
             model = bridge.get_model(
                 post_model_creation_callbacks=post_model_creation_callbacks,
                 wrap_with_ddp=wrap_config.wrap_with_ddp,
                 fp16=tf_config.fp16,
                 bf16=tf_config.bf16,
-                ddp_config=override_ddp_config,
+                ddp_config=vanilla_ddp_config,
             )
 
         if isinstance(tf_config, MLATransformerConfig):
