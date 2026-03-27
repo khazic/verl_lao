@@ -14,10 +14,10 @@ TRAIN_FILES=${TRAIN_FILES:-"[/llm-align/liuchonghan/ins_dataset/ins_dataset/dayu
 MODEL_PATH=${MODEL_PATH:-/llm-align/open_models/Qwen3.5/Qwen3.5-35B-A3B}
 
 TP_SIZE=${TP_SIZE:-2}
-PP_SIZE=${PP_SIZE:-2}
+PP_SIZE=${PP_SIZE:-4}
 VPP_SIZE=${VPP_SIZE:-null}
 CP_SIZE=${CP_SIZE:-1}
-EP_SIZE=${EP_SIZE:-4}
+EP_SIZE=${EP_SIZE:-2}
 ETP_SIZE=${ETP_SIZE:-1}
 
 TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-16}
@@ -109,7 +109,7 @@ ENGINE_CONFIG="\
     engine.context_parallel_size=${CP_SIZE} \
     engine.expert_model_parallel_size=${EP_SIZE} \
     engine.expert_tensor_parallel_size=${ETP_SIZE} \
-    engine.use_distributed_optimizer=True \
+    engine.use_distributed_optimizer=False \
     engine.use_mbridge=True \
     engine.vanilla_mbridge=True \
     engine.dtype=${DTYPE} \
