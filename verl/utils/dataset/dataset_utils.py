@@ -65,8 +65,12 @@ class SFTTensorCollator:
 
         # Handle tensor values by creating a NestedTensor.
         for key in tensor_keys:
-            if isinstance(batch[0][key], torch.Tensor):
-                tensors = [item[key] for item in batch]
+            # Skip keys that are not present in all samples (e.g., multi_modal_inputs)
+            present_batch = [item for item in batch if key in item]
+            if not present_batch:
+                continue
+            if isinstance(present_batch[0][key], torch.Tensor):
+                tensors = [item[key] for item in present_batch]
                 if tensors[0].dim() >= 2:
                     # For multi-dim tensors (e.g., 3D position_ids with shape (num_heads, seq_len)),
                     # use nested_tensor_from_jagged with explicit jagged_dim to avoid ambiguity
@@ -80,7 +84,7 @@ class SFTTensorCollator:
                 else:
                     final_batch[key] = torch.nested.as_nested_tensor(tensors, layout=torch.jagged)
             else:
-                tensors = [NonTensorData(item.get(key)) for item in batch]
+                tensors = [NonTensorData(item.get(key)) for item in present_batch]
                 final_batch[key] = torch.stack(tensors, dim=0)
 
         return final_batch
