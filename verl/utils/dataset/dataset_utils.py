@@ -61,16 +61,15 @@ class SFTTensorCollator:
 
         final_batch = {}
 
-        tensor_keys = set().union(*(d.keys() for d in batch))
+        # Use intersection of keys so that only keys present in ALL samples are collated.
+        # This avoids batch size mismatches for optional keys (e.g., multi_modal_inputs
+        # which only exists in samples with vision inputs).
+        tensor_keys = set.intersection(*(set(d.keys()) for d in batch)) if batch else set()
 
         # Handle tensor values by creating a NestedTensor.
         for key in tensor_keys:
-            # Skip keys that are not present in all samples (e.g., multi_modal_inputs)
-            present_batch = [item for item in batch if key in item]
-            if not present_batch:
-                continue
-            if isinstance(present_batch[0][key], torch.Tensor):
-                tensors = [item[key] for item in present_batch]
+            if isinstance(batch[0][key], torch.Tensor):
+                tensors = [item[key] for item in batch]
                 if tensors[0].dim() >= 2:
                     # For multi-dim tensors (e.g., 3D position_ids with shape (num_heads, seq_len)),
                     # use nested_tensor_from_jagged with explicit jagged_dim to avoid ambiguity
@@ -84,7 +83,7 @@ class SFTTensorCollator:
                 else:
                     final_batch[key] = torch.nested.as_nested_tensor(tensors, layout=torch.jagged)
             else:
-                tensors = [NonTensorData(item.get(key)) for item in present_batch]
+                tensors = [NonTensorData(item.get(key)) for item in batch]
                 final_batch[key] = torch.stack(tensors, dim=0)
 
         return final_batch
