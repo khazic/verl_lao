@@ -9,7 +9,7 @@ MASTER_PORT=${MASTER_PORT:-8888}
 RAW_MASTER_ADDR=${MASTER_ADDR:-127.0.0.1}
 MASTER_ADDR=$(python3 -c "import socket; print(socket.getaddrinfo('${RAW_MASTER_ADDR}', None, socket.AF_INET)[0][4][0])" 2>/dev/null || echo "${RAW_MASTER_ADDR}")
 
-TRAIN_FILES=${TRAIN_FILES:-"[/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-001-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-002-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-003-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-004-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-005-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-006-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-007-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-008-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-009-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-010-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-011-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/trans_multi2multi_110w_gemini25_claude_only_messages.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/zangyu_165039.parquet]"}
+TRAIN_FILES=${TRAIN_FILES:-"[/llm-align/liuchonghan/ins_dataset/ins_dataset/dayuzhong/lowest_metricx_train_selected.cleaned.messages.parquet]"}
 
 MODEL_PATH=${MODEL_PATH:-/llm-align/open_models/Qwen3.5/Qwen3.5-35B-A3B}
 
