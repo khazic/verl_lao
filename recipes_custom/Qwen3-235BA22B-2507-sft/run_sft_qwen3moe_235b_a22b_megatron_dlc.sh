@@ -81,6 +81,7 @@ export WANDB_MODE=offline
 export NCCL_DEBUG=WARN
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export PYTHONPATH=${PYTHONPATH:-}:/mnt/data/liuchonghan/verl_lao
+export RAY_TMPDIR=/llm-align/liuchonghan/ray_cache
 
 torchrun \
     --nnodes=${NNODES} \

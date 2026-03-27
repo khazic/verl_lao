@@ -81,6 +81,7 @@ fi
 export WANDB_MODE=offline
 export NCCL_DEBUG=WARN
 export PYTHONPATH=${PYTHONPATH:-}:/mnt/data/liuchonghan/verl
+export RAY_TMPDIR=/llm-align/liuchonghan/ray_cache
 
 torchrun \
     --nnodes=${NNODES} \

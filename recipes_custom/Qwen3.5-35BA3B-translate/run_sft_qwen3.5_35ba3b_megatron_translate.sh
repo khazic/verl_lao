@@ -73,6 +73,7 @@ export PYTORCH_ALLOC_CONF=expandable_segments:True
 export HYDRA_FULL_ERROR=1
 export TORCHDYNAMO_DISABLE=1
 export PYTHONPATH=${PYTHONPATH:-}:/llm-align/liuchonghan/verl_lao
+export RAY_TMPDIR=/llm-align/liuchonghan/ray_cache
 
 # Key settings:
 #   engine.use_remove_padding=False   - keep bshd path instead of THD

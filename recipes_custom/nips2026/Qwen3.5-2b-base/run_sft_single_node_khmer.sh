@@ -76,6 +76,7 @@ export NCCL_DEBUG=WARN
 export PYTORCH_ALLOC_CONF=expandable_segments:True
 export HYDRA_FULL_ERROR=1
 export PYTHONPATH=${PYTHONPATH:-}:/llm-align/liuchonghan/verl_lao
+export RAY_TMPDIR=/llm-align/liuchonghan/ray_cache
 mkdir -p "${WANDB_DIR}"
 
 echo ">>> 数据文件: ${TRAIN_FILES}, total_epochs=${TOTAL_EPOCHS}"

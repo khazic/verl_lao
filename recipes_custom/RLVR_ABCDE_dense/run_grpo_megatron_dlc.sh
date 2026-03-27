@@ -5,6 +5,7 @@ export CUDA_DEVICE_MAX_CONNECTIONS=1
 export VLLM_USE_V1=1
 export VERL_USE_GPT_OSS=0
 export PYTHONPATH=/llm-align/liuchonghan/verl_lao:${PYTHONPATH:-}
+export RAY_TMPDIR=/llm-align/liuchonghan/ray_cache
 
 ENTRYPOINT=${ENTRYPOINT:-"-m verl.trainer.main_ppo"}
 TRAIN_FILES=${TRAIN_FILES:-/llm-alignment/liuchonghan/all_data_merged_rlhf.json}
@@ -33,9 +34,11 @@ if [ "$NODE_RANK" -eq 0 ]; then
   ray start --head \
     --node-ip-address="$MASTER_ADDR" \
     --port="$RAY_PORT" \
-    --dashboard-port="$RAY_DASHBOARD_PORT"
+    --dashboard-port="$RAY_DASHBOARD_PORT" \
+    --temp-dir=/llm-align/liuchonghan/ray_cache
 else
-  ray start --address="$RAY_ADDRESS"
+  ray start --address="$RAY_ADDRESS" \
+    --temp-dir=/llm-align/liuchonghan/ray_cache
   exit 0
 fi
 

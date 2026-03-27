@@ -60,6 +60,7 @@ export NCCL_DEBUG=WARN
 export PYTORCH_ALLOC_CONF=expandable_segments:True
 export HYDRA_FULL_ERROR=1
 export PYTHONPATH=${PYTHONPATH:-}:/llm-align/liuchonghan/verl_lao
+export RAY_TMPDIR=/llm-align/liuchonghan/ray_cache
 
 # Key Qwen3.5 settings:
 #   engine.use_remove_padding=False   - GDN requires bshd format (no THD)
