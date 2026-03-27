@@ -71,6 +71,7 @@ export NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME:-eth0}
 export GLOO_SOCKET_IFNAME=${GLOO_SOCKET_IFNAME:-${NCCL_SOCKET_IFNAME}}
 export PYTORCH_ALLOC_CONF=expandable_segments:True
 export HYDRA_FULL_ERROR=1
+export TORCHDYNAMO_DISABLE=1
 export PYTHONPATH=${PYTHONPATH:-}:/llm-align/liuchonghan/verl_lao
 
 # Key settings:
@@ -111,7 +112,6 @@ ENGINE_CONFIG="\
     engine.use_mbridge=True \
     engine.vanilla_mbridge=True \
     engine.dtype=${DTYPE} \
-    +engine.use_torch_compile=False \
     engine.use_remove_padding=False \
     engine.override_transformer_config.attention_backend=auto \
     +engine.override_transformer_config.recompute_method=uniform \
