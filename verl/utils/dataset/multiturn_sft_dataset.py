@@ -397,7 +397,11 @@ class MultiTurnSFTDataset(Dataset):
                 "position_ids": position_ids,
                 "loss_mask": loss_mask,
             }
-            if len(multi_modal_inputs) > 0:
+            if self.processor is not None:
+                # Always include multi_modal_inputs when a processor is present, even if empty ({} for
+                # text-only samples), so that mixed text+image batches have consistent keys for the
+                # collator. extract_multi_modal_inputs() skips empty dicts gracefully, and the model
+                # handles pixel_values=None via its built-in dummy image path.
                 res["multi_modal_inputs"] = multi_modal_inputs
             return res
         elif self.pad_mode == DatasetPadMode.NO_PADDING:
@@ -415,7 +419,11 @@ class MultiTurnSFTDataset(Dataset):
                 "position_ids": position_ids,
                 "loss_mask": loss_mask,
             }
-            if len(multi_modal_inputs) > 0:
+            if self.processor is not None:
+                # Always include multi_modal_inputs when a processor is present, even if empty ({} for
+                # text-only samples), so that mixed text+image batches have consistent keys for the
+                # collator. extract_multi_modal_inputs() skips empty dicts gracefully, and the model
+                # handles pixel_values=None via its built-in dummy image path.
                 res["multi_modal_inputs"] = multi_modal_inputs
             return res
         else:
