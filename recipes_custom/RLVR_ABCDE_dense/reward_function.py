@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Reward function
+Reward function for multiple-choice (ABCDE) tasks.
 """
 
 import re
@@ -21,7 +21,8 @@ import re
 DEFAULT_CHOICES = ("A", "B", "C", "D", "E")
 BOXED_PATTERN = re.compile(r"\\boxed\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}")
 CHOICE_PATTERN = re.compile(
-    r"(?:answer|option|choice)?\s*[:=]?\s*([A-Za-z])\b", re.IGNORECASE
+    r"(?:answer|option|choice|答案|选项)\s*[:：=是为]?\s*\**([A-E])\**",
+    re.IGNORECASE,
 )
 
 
@@ -30,35 +31,48 @@ def _extract_boxed_answer(text: str) -> str:
     return matches[-1] if matches else ""
 
 
-def _normalize_choice(text: str, valid_choices=DEFAULT_CHOICES) -> str:
-    text = (text or "").strip().upper()
-    for char in text:
+def _scan_first_choice(text: str, valid_choices=DEFAULT_CHOICES) -> str:
+    """Scan text character by character and return the first valid choice letter."""
+    for char in (text or "").upper():
         if char in valid_choices:
             return char
     return ""
 
 
+def _normalize_choice(text: str, valid_choices=DEFAULT_CHOICES) -> str:
+    """Exact match only — used for CHOICE_PATTERN results and ground truth."""
+    text = (text or "").strip().upper()
+    if text in valid_choices:
+        return text
+    return ""
+
+
 def extract_choice(text: str, valid_choices=DEFAULT_CHOICES) -> str:
     """
-    Extract a single-letter choice, preferring \\boxed{} values but falling back
-    to phrases like "Answer: C" or the first standalone letter.
+    Extract a single-letter choice from model output.
+    Priority:
+      1. \\boxed{X} — scan within the boxed content (already constrained)
+      2. Explicit declaration: "Answer: C" / "答案：B"
+    Returns "" if no answer can be reliably extracted.
     """
     text = str(text or "")
-    candidate = _normalize_choice(_extract_boxed_answer(text), valid_choices)
-    if candidate:
-        return candidate
+    boxed = _extract_boxed_answer(text)
+    if boxed:
+        candidate = _scan_first_choice(boxed, valid_choices)
+        if candidate:
+            return candidate
     match = CHOICE_PATTERN.search(text)
     if match:
         candidate = _normalize_choice(match.group(1), valid_choices)
         if candidate:
             return candidate
-    return _normalize_choice(text, valid_choices)
+    return ""
 
 
-def char_count_reward_function(data_source, solution_str, ground_truth, extra_info=None):
+def mcq_reward_function(data_source, solution_str, ground_truth, extra_info=None):
     try:
         model_choice = extract_choice(solution_str)
-        gold_choice = extract_choice(ground_truth)
+        gold_choice = _normalize_choice(ground_truth)
         return 1 if model_choice and gold_choice and model_choice == gold_choice else 0
     except Exception:
         print(ground_truth, solution_str)
