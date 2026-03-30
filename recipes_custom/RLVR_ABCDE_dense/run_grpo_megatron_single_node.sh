@@ -14,7 +14,23 @@ export GLOO_SOCKET_IFNAME=${GLOO_SOCKET_IFNAME:-eth0}
 export GLOO_IPV6=${GLOO_IPV6:-"0"}
 export NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME:-eth0}
 export RAY_TMPDIR=/llm-align/liuchonghan/ray_cache
-export TMPDIR=/dev/shm/tmp
+
+# Redirect cache/temp dirs away from overlay filesystem
+export TMPDIR=/llm-align/liuchonghan/tmp
+export TEMP=/llm-align/liuchonghan/tmp
+export TMP=/llm-align/liuchonghan/tmp
+export HF_HOME=/llm-align/liuchonghan/hf_cache
+export TRANSFORMERS_CACHE=/llm-align/liuchonghan/hf_cache/hub
+export TORCH_HOME=/llm-align/liuchonghan/torch_cache
+export TORCH_EXTENSIONS_DIR=/llm-align/liuchonghan/torch_extensions
+export TRITON_CACHE_DIR=/llm-align/liuchonghan/triton_cache
+export XDG_CACHE_HOME=/llm-align/liuchonghan/xdg_cache
+mkdir -p /llm-align/liuchonghan/tmp \
+         /llm-align/liuchonghan/hf_cache \
+         /llm-align/liuchonghan/torch_cache \
+         /llm-align/liuchonghan/torch_extensions \
+         /llm-align/liuchonghan/triton_cache \
+         /llm-align/liuchonghan/xdg_cache
 
 mkdir -p "$WANDB_DIR" "$RAY_TMPDIR" "$TMPDIR"
 

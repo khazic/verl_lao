@@ -89,6 +89,23 @@ export PYTORCH_ALLOC_CONF=expandable_segments:True
 export HYDRA_FULL_ERROR=1
 export PYTHONPATH=${PYTHONPATH:-}:/llm-align/liuchonghan/verl_lao
 export RAY_TMPDIR=/llm-align/liuchonghan/ray_cache
+
+# Redirect cache/temp dirs away from overlay filesystem
+export TMPDIR=/llm-align/liuchonghan/tmp
+export TEMP=/llm-align/liuchonghan/tmp
+export TMP=/llm-align/liuchonghan/tmp
+export HF_HOME=/llm-align/liuchonghan/hf_cache
+export TRANSFORMERS_CACHE=/llm-align/liuchonghan/hf_cache/hub
+export TORCH_HOME=/llm-align/liuchonghan/torch_cache
+export TORCH_EXTENSIONS_DIR=/llm-align/liuchonghan/torch_extensions
+export TRITON_CACHE_DIR=/llm-align/liuchonghan/triton_cache
+export XDG_CACHE_HOME=/llm-align/liuchonghan/xdg_cache
+mkdir -p /llm-align/liuchonghan/tmp \
+         /llm-align/liuchonghan/hf_cache \
+         /llm-align/liuchonghan/torch_cache \
+         /llm-align/liuchonghan/torch_extensions \
+         /llm-align/liuchonghan/triton_cache \
+         /llm-align/liuchonghan/xdg_cache
 mkdir -p "${WANDB_DIR}"
 
 echo ">>> 数据文件: ${TRAIN_FILES}, total_epochs=${TOTAL_EPOCHS}"
