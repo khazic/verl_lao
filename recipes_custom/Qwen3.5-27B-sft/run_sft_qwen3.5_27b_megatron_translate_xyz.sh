@@ -3,7 +3,7 @@ set -xeuo pipefail
 
 
 NUM_GPUS=${NUM_GPUS:-8}
-NNODES=${WORLD_SIZE:-${NNODES:-2}}
+NNODES=${WORLD_SIZE:-${NNODES:-4}}
 NODE_RANK=${RANK:-${NODE_RANK:-0}}
 MASTER_PORT=${MASTER_PORT:-8888}
 
@@ -12,7 +12,7 @@ MASTER_ADDR=$(python3 -c "import socket; print(socket.getaddrinfo('${RAW_MASTER_
 
 TRAIN_FILES=${TRAIN_FILES:-"[/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-001-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-002-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-003-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-004-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-005-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-006-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-007-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-008-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-009-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-010-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/part-011-of-011.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/trans_multi2multi_110w_gemini25_claude_only_messages.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/xiaoyuzhong/zangyu_165039.parquet]"}
 
-MODEL_PATH=${MODEL_PATH:-/llm-align/liuchonghan/ckpt_verl/sft/verl_sft_qwen3_5_27b_translate_0316/qwen3_5_27b-megatron-tp8-pp1-cp1/global_step_11000/huggingface}
+MODEL_PATH=${MODEL_PATH:-/llm-align/liuchonghan/ckpt_verl/sft/verl_sft_qwen3_5_27b_megatron_translate_0325/qwen3_5_27b_megatron_translate_0325-megatron-tp4-pp1-cp1/global_step_3000/huggingface}
 
 TP_SIZE=${TP_SIZE:-4}
 PP_SIZE=${PP_SIZE:-1}
@@ -21,8 +21,8 @@ CP_SIZE=${CP_SIZE:-1}
 EP_SIZE=${EP_SIZE:-1}
 ETP_SIZE=${ETP_SIZE:-1}
 
-TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-64}
-MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-2}
+TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-128}
+MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-4}
 MAX_LENGTH=${MAX_LENGTH:-4096}
 MAX_TOKEN_LEN_PER_GPU=${MAX_TOKEN_LEN_PER_GPU:-${MAX_LENGTH}}
 PAD_MODE=${PAD_MODE:-no_padding}
@@ -38,7 +38,7 @@ echo ">>> 数据文件: ${TRAIN_FILES}, total_epochs=${TOTAL_EPOCHS}"
 BACKEND=megatron
 RESUME_MODE=${RESUME_MODE:-disable}
 
-project_name=verl_sft_qwen3_5_27b_megatron_translate_0325
+project_name=verl_sft_qwen3_5_27b_megatron_translate_0330_xyz
 exp_name=qwen3_5_27b_megatron_translate_0325-${BACKEND}-tp${TP_SIZE}-pp${PP_SIZE}-cp${CP_SIZE}
 ckpts_home=${ckpts_home:-/llm-align/liuchonghan/ckpt_verl/sft/${project_name}/${exp_name}}
 
