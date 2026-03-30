@@ -73,11 +73,13 @@ export HF_HOME=/llm-align/liuchonghan/hf_cache
 export TRANSFORMERS_CACHE=/llm-align/liuchonghan/hf_cache/hub
 export TORCH_HOME=/llm-align/liuchonghan/torch_cache
 export TORCH_EXTENSIONS_DIR=/llm-align/liuchonghan/torch_extensions
+export TRITON_CACHE_DIR=/llm-align/liuchonghan/triton_cache
 export XDG_CACHE_HOME=/llm-align/liuchonghan/xdg_cache
 mkdir -p /llm-align/liuchonghan/tmp \
          /llm-align/liuchonghan/hf_cache \
          /llm-align/liuchonghan/torch_cache \
          /llm-align/liuchonghan/torch_extensions \
+         /llm-align/liuchonghan/triton_cache \
          /llm-align/liuchonghan/xdg_cache
 
 # Key Qwen3.5 settings:
