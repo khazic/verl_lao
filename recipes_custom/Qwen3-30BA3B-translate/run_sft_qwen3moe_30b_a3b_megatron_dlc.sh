@@ -68,6 +68,12 @@ NODE_RANK=${RANK:-0}
 MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"} 
 MASTER_PORT=${MASTER_PORT:-23457} 
 
+LAUNCH_DIR=${LAUNCH_DIR:-${PWD}}
+LAUNCH_SCRIPT_DIR=$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=/dev/null
+source "${LAUNCH_SCRIPT_DIR}/../common_launch_logging.sh"
+init_launch_logging "$0" "${exp_name}" "${NODE_RANK:-0}" "${LAUNCH_DIR}"
+
 echo ">>> 节点信息: RANK $NODE_RANK / WORLD_SIZE $NNODES"
 echo ">>> 通信信息: MASTER $MASTER_ADDR : $MASTER_PORT"
 
@@ -85,6 +91,7 @@ torchrun \
     --node_rank=${NODE_RANK} \
     --master_addr=${MASTER_ADDR} \
     --master_port=${MASTER_PORT} \
+    "${TORCHRUN_LOGGING_ARGS[@]}" \
     --nproc-per-node=8 \
     ${ENTRYPOINT} \
     data.train_files="${TRAIN_FILES}" \

@@ -19,6 +19,12 @@ MASTER_ADDR=${PET_MASTER_ADDR:-${MASTER_ADDR:-"127.0.0.1"}}
 MASTER_PORT=${PET_MASTER_PORT:-${MASTER_PORT:-23457}}
 N_GPUS_PER_NODE=${PET_NPROC_PER_NODE:-${NPROC_PER_NODE:-${N_GPUS_PER_NODE:-8}}}
 
+LAUNCH_DIR=${LAUNCH_DIR:-${PWD}}
+LAUNCH_SCRIPT_DIR=$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=/dev/null
+source "${LAUNCH_SCRIPT_DIR}/../common_launch_logging.sh"
+init_launch_logging "$0" "${EXPERIMENT_NAME}" "${NODE_RANK:-0}" "${LAUNCH_DIR}"
+
 FSDP_STRATEGY=${FSDP_STRATEGY:-fsdp2}
 FSDP_SIZE=${FSDP_SIZE:-8}
 ACTOR_OFFLOAD=${ACTOR_OFFLOAD:-False}

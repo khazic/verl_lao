@@ -42,6 +42,13 @@ project_name=verl_sft_qwen3_5_27b_translate
 exp_name=qwen3_5_27b-${BACKEND}-tp${TP_SIZE}-pp${PP_SIZE}-cp${CP_SIZE}
 ckpts_home=${ckpts_home:-/llm-align/liuchonghan/ckpt_verl/sft/${project_name}/${exp_name}}
 
+LAUNCH_DIR=${LAUNCH_DIR:-${PWD}}
+LAUNCH_SCRIPT_DIR=$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=/dev/null
+source "${LAUNCH_SCRIPT_DIR}/../common_launch_logging.sh"
+init_launch_logging "$0" "${exp_name}" "${NODE_RANK:-0}" "${LAUNCH_DIR}"
+
+
 echo ">>> 节点信息: RANK ${NODE_RANK} / WORLD_SIZE ${NNODES}"
 echo ">>> 通信信息: MASTER ${MASTER_ADDR} : ${MASTER_PORT}"
 
@@ -118,6 +125,7 @@ torchrun \
     --node_rank=${NODE_RANK} \
     --master_addr=${MASTER_ADDR} \
     --master_port=${MASTER_PORT} \
+    "${TORCHRUN_LOGGING_ARGS[@]}" \
     -m verl.trainer.sft_trainer \
     "data.train_files=${TRAIN_FILES}" \
     data.train_batch_size=${TRAIN_BATCH_SIZE} \

@@ -16,6 +16,13 @@ TRAIN_FILES=${TRAIN_FILES:-"[${PARQUET_DIR}/indonesian__to__burmese.parquet,${PA
 PROJECT_NAME=${PROJECT_NAME:-nips2026_qwen3_5_2b_base}
 EXPERIMENT_NAME=${EXPERIMENT_NAME:-indonesian_to_all_parquet_by_language}
 CKPT_HOME=${CKPT_HOME:-/llm-align/liuchonghan/ckpt_verl/sft/${PROJECT_NAME}/${EXPERIMENT_NAME}}
+
+LAUNCH_DIR=${LAUNCH_DIR:-${PWD}}
+LAUNCH_SCRIPT_DIR=$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=/dev/null
+source "${LAUNCH_SCRIPT_DIR}/../../common_launch_logging.sh"
+init_launch_logging "$0" "${EXPERIMENT_NAME}" "${NODE_RANK:-0}" "${LAUNCH_DIR}"
+
 RESUME_MODE=${RESUME_MODE:-disable}
 
 BACKEND=${BACKEND:-megatron}
@@ -115,6 +122,7 @@ torchrun \
     --node_rank=${NODE_RANK} \
     --master_addr=${MASTER_ADDR} \
     --master_port=${MASTER_PORT} \
+    "${TORCHRUN_LOGGING_ARGS[@]}" \
     -m verl.trainer.sft_trainer \
     data.train_files="${TRAIN_FILES}" \
     data.train_batch_size=${TRAIN_BATCH_SIZE} \

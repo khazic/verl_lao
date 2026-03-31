@@ -41,6 +41,13 @@ PROJECT_NAME=${PROJECT_NAME:-rlvr_8b}
 EXPERIMENT_NAME=${EXPERIMENT_NAME:-rlvr_8b_grpo_megatron_single}
 DEFAULT_LOCAL_DIR=${DEFAULT_LOCAL_DIR:-/llm-align/liuchonghan/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}}
 
+LAUNCH_DIR=${LAUNCH_DIR:-${PWD}}
+LAUNCH_SCRIPT_DIR=$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=/dev/null
+source "${LAUNCH_SCRIPT_DIR}/../common_launch_logging.sh"
+init_launch_logging "$0" "${EXPERIMENT_NAME}" "${NODE_RANK:-0}" "${LAUNCH_DIR}"
+
+
 NNODES=${NNODES:-4}
 NODE_RANK=${NODE_RANK:-0}
 MASTER_ADDR=${MASTER_ADDR:-10.178.170.212}
