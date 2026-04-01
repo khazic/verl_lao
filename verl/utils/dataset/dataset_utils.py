@@ -13,10 +13,13 @@
 # limitations under the License.
 
 
+import logging
 from enum import Enum
 
 import torch
 from tensordict.tensorclass import NonTensorData
+
+logger = logging.getLogger(__name__)
 
 
 class DatasetPadMode(str, Enum):
@@ -62,14 +65,12 @@ class SFTTensorCollator:
         final_batch = {}
 
         union_keys = set().union(*(d.keys() for d in batch))
-        tensor_keys = set(batch[0].keys()).intersection(*(d.keys() for d in batch[1:])) if batch else set()
+        tensor_keys = set.intersection(*[set(d.keys()) for d in batch]) if batch else set()
         missing_keys = union_keys - tensor_keys
         if missing_keys:
-            raise ValueError(
-                f"Keys {missing_keys} are missing in some samples within the batch. "
-                f"Mixing samples with and without optional keys (e.g., multi_modal_inputs) "
-                f"in the same batch is not supported. Use a modal-aware batch sampler to "
-                f"ensure all samples in a batch have the same keys."
+            logger.warning(
+                f"Keys {missing_keys} are missing in some samples and will be skipped during collation. "
+                f"For mixed text+image datasets, ensure text-only samples include an empty multi_modal_inputs dict."
             )
 
         # Handle tensor values by creating a NestedTensor.

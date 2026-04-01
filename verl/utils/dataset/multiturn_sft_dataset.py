@@ -127,6 +127,12 @@ class MultiTurnSFTDataset(Dataset):
 
         self._download()
         self._read_files_and_process()
+        # True when the dataframe has image/video columns, indicating a visual or mixed dataset.
+        # Text-only samples in a visual dataset will include an empty multi_modal_inputs dict
+        # so that all samples in a batch have consistent top-level keys for the collator.
+        self.is_visual_dataset = (
+            self.image_key in self.dataframe.columns or self.video_key in self.dataframe.columns
+        )
 
     def _download(self):
         for i, parquet_file in enumerate(self.parquet_files):
@@ -334,10 +340,6 @@ class MultiTurnSFTDataset(Dataset):
         for k in keys_to_remove:
             del multi_modal_inputs[k]
 
-        # mm_token_type_ids is a tokenizer artifact that marks text vs vision tokens.
-        # For text-only data it is all-zeros and not needed for training.
-        multi_modal_inputs.pop("mm_token_type_ids", None)
-
         for k, v in multi_modal_inputs.items():
             multi_modal_inputs[k] = torch.concat(v, dim=0)
 
@@ -397,11 +399,13 @@ class MultiTurnSFTDataset(Dataset):
                 "position_ids": position_ids,
                 "loss_mask": loss_mask,
             }
-            if self.processor is not None:
-                # Always include multi_modal_inputs when a processor is present, even if empty ({} for
-                # text-only samples), so that mixed text+image batches have consistent keys for the
-                # collator. extract_multi_modal_inputs() skips empty dicts gracefully, and the model
-                # handles pixel_values=None via its built-in dummy image path.
+            if multi_modal_inputs or self.is_visual_dataset:
+                # Include multi_modal_inputs when:
+                # - this sample has visual content (non-empty), OR
+                # - this is a visual/mixed dataset and the sample is text-only (empty dict {}).
+                # The empty dict ensures all samples in the batch have the same top-level keys,
+                # which the collator requires. extract_multi_modal_inputs() skips empty dicts
+                # gracefully, so the model only processes real visual content.
                 res["multi_modal_inputs"] = multi_modal_inputs
             return res
         elif self.pad_mode == DatasetPadMode.NO_PADDING:
@@ -419,11 +423,13 @@ class MultiTurnSFTDataset(Dataset):
                 "position_ids": position_ids,
                 "loss_mask": loss_mask,
             }
-            if self.processor is not None:
-                # Always include multi_modal_inputs when a processor is present, even if empty ({} for
-                # text-only samples), so that mixed text+image batches have consistent keys for the
-                # collator. extract_multi_modal_inputs() skips empty dicts gracefully, and the model
-                # handles pixel_values=None via its built-in dummy image path.
+            if multi_modal_inputs or self.is_visual_dataset:
+                # Include multi_modal_inputs when:
+                # - this sample has visual content (non-empty), OR
+                # - this is a visual/mixed dataset and the sample is text-only (empty dict {}).
+                # The empty dict ensures all samples in the batch have the same top-level keys,
+                # which the collator requires. extract_multi_modal_inputs() skips empty dicts
+                # gracefully, so the model only processes real visual content.
                 res["multi_modal_inputs"] = multi_modal_inputs
             return res
         else:
