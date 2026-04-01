@@ -61,47 +61,52 @@ examples/<name>_trainer/
 
 ### Step 3: Implement the Trainer Class
 
+**Option A — new advantage estimator (recommended for most cases)**
+
+Advantage computation is handled by a standalone `compute_advantage()` function in
+`ray_trainer.py`, not a method. The correct extension point is `register_adv_est`:
+
 ```python
 # examples/<name>_trainer/<name>_trainer.py
-import torch
-from omegaconf import DictConfig
-from verl import DataProto
-from verl.trainer.ppo.ray_trainer import RayPPOTrainer  # or write from scratch
+from verl.trainer.ppo.core_algos import register_adv_est
 
+
+@register_adv_est("<name>")
+def compute_<name>_advantage(token_level_rewards, response_mask, config, **kwargs):
+    """Custom advantage estimator for <name>.
+
+    Args:
+        token_level_rewards: shape [bs, resp_len]
+        response_mask:        shape [bs, resp_len]
+        config:               trainer OmegaConf config
+
+    Returns:
+        advantages: shape [bs, resp_len]
+        returns:    shape [bs, resp_len]
+    """
+    # ... your advantage logic
+    return advantages, returns
+```
+
+**Option B — structural trainer changes**
+
+Only subclass `RayPPOTrainer` if you need to change the overall training loop
+(e.g., add a second optimizer step, change data flow). Override `fit()` directly:
+
+```python
+from verl.trainer.ppo.ray_trainer import RayPPOTrainer
 
 class MyTrainer(RayPPOTrainer):
-    """My custom RL trainer."""
-
-    def _compute_advantage(self, data: DataProto) -> DataProto:
-        """Override advantage computation for your algorithm."""
-        rewards = data.batch["token_level_scores"]  # shape: [bs, seqlen]
-        # ... your advantage computation
-        data.batch["advantages"] = advantages
-        data.batch["returns"] = returns
-        return data
-
     def fit(self):
-        """Main training loop."""
-        for epoch in range(self.config.trainer.total_epochs):
-            for batch_dict in self.train_dataloader:
-                # 1. Generate rollouts
-                data: DataProto = self.actor_rollout_ref.generate_sequences(batch_dict)
-
-                # 2. Compute rewards
-                reward_tensor = self.reward_fn(data)
-                data.batch["token_level_scores"] = reward_tensor
-
-                # 3. Compute advantages (your algorithm logic here)
-                data = self._compute_advantage(data)
-
-                # 4. Update actor
-                actor_output = self.actor_rollout_ref.update_actor(data)
-
-                # 5. Log metrics
-                self._log_metrics(actor_output)
+        for batch_dict in self.train_dataloader:
+            data = self.actor_rollout_ref.generate_sequences(batch_dict)
+            # ... custom loop logic
 ```
 
 ### Step 4: Write Run Script
+
+**Option A** — custom advantage estimator: import your module first so
+`@register_adv_est` executes, then call the standard entry point:
 
 ```bash
 #!/bin/bash
@@ -109,8 +114,12 @@ class MyTrainer(RayPPOTrainer):
 
 set -x
 
-python3 -m verl.trainer.main_ppo \
-    algorithm.adv_estimator=grpo \
+python3 -c "
+import examples.<name>_trainer.<name>_trainer  # registers the estimator
+from verl.trainer.main_ppo import main
+main()
+" -- \
+    algorithm.adv_estimator=<name> \
     data.train_files=$HOME/data/gsm8k/train.parquet \
     data.val_files=$HOME/data/gsm8k/test.parquet \
     data.train_batch_size=256 \

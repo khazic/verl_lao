@@ -21,7 +21,7 @@ veRL datasets follow a two-step pattern:
 
 1. **Preprocessing script** (`examples/data_preprocess/<name>.py`) — run once offline to
    convert raw data into parquet files with a fixed schema
-2. **`RLDataset`** (`verl/utils/dataset/rl_dataset.py`) — runtime dataset class that
+2. **`RLHFDataset`** (`verl/utils/dataset/rl_dataset.py`) — runtime dataset class that
    reads the parquet files; you usually do NOT need to modify this
 
 ## Required Schema

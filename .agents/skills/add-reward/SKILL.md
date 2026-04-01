@@ -87,7 +87,7 @@ Update `verl/utils/reward_score/__init__.py` to include your new data source:
 ```python
 from verl.utils.reward_score.<name> import compute_score as <name>_compute_score
 
-def default_compute_score(data_source, solution_str, ground_truth, extra_info=None):
+def default_compute_score(data_source, solution_str, ground_truth, extra_info=None, **kwargs):
     # ... existing cases ...
     elif data_source == "<your_dataset_name>":
         return <name>_compute_score(solution_str, ground_truth)
