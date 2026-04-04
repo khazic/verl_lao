@@ -2,11 +2,19 @@
 set -xeuo pipefail
 
 NUM_GPUS=${NUM_GPUS:-8}
-NNODES=${NNODES:-4}
-NODE_RANK=${NODE_RANK:-${RANK:-0}}
-MASTER_PORT=${MASTER_PORT:-8888}
+# Normalize user-provided launch arguments first, then clear platform-injected
+# distributed env vars so this script behaves predictably for manual 4-node runs.
+USER_MASTER_ADDR=${MASTER_ADDR:-127.0.0.1}
+USER_MASTER_PORT=${MASTER_PORT:-8888}
+USER_NNODES=${NNODES:-4}
+USER_NODE_RANK=${NODE_RANK:-${RANK:-0}}
+unset WORLD_SIZE RANK LOCAL_RANK GROUP_RANK ROLE_RANK LOCAL_WORLD_SIZE
 
-RAW_MASTER_ADDR=${MASTER_ADDR:-127.0.0.1}
+NNODES=${USER_NNODES}
+NODE_RANK=${USER_NODE_RANK}
+MASTER_PORT=${USER_MASTER_PORT}
+
+RAW_MASTER_ADDR=${USER_MASTER_ADDR}
 MASTER_ADDR=$(python3 -c "import socket; print(socket.getaddrinfo('${RAW_MASTER_ADDR}', None, socket.AF_INET)[0][4][0])" 2>/dev/null || echo "${RAW_MASTER_ADDR}")
 
 TRAIN_FILES=${TRAIN_FILES:-"[/llm-align/liuchonghan/ins_dataset/ins_dataset/dayuzhong/dayuzhong_instruct_gemini3.1_5w_messages.parquet]"}
@@ -20,18 +28,17 @@ CP_SIZE=${CP_SIZE:-1}
 EP_SIZE=${EP_SIZE:-2}
 ETP_SIZE=${ETP_SIZE:-2}
 
-TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-8}
+TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-32}
 MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-1}
-MAX_LENGTH=${MAX_LENGTH:-1024}
+MAX_LENGTH=${MAX_LENGTH:-2048}
 MAX_TOKEN_LEN_PER_GPU=${MAX_TOKEN_LEN_PER_GPU:-${MAX_LENGTH}}
-PAD_MODE=${PAD_MODE:-right}
+PAD_MODE=${PAD_MODE:-no_padding}
 TRUNCATION=${TRUNCATION:-right}
 NUM_WORKERS=${NUM_WORKERS:-1}
 LR=${LR:-5e-6}
 MIN_LR=${MIN_LR:-5e-7}
 DTYPE=${DTYPE:-bfloat16}
 TOTAL_EPOCHS=${TOTAL_EPOCHS:-1}
-USE_REMOVE_PADDING=${USE_REMOVE_PADDING:-true}
 OUTPUT_ROUTER_LOGITS=${OUTPUT_ROUTER_LOGITS:-True}
 ROUTER_DTYPE=${ROUTER_DTYPE:-float32}
 MOE_ROUTER_LOAD_BALANCING_TYPE=${MOE_ROUTER_LOAD_BALANCING_TYPE:-}
@@ -41,7 +48,7 @@ MOE_Z_LOSS_COEFF=${MOE_Z_LOSS_COEFF:-}
 BACKEND=megatron
 RESUME_MODE=${RESUME_MODE:-disable}
 
-project_name=${PROJECT_NAME:-verl_sft_qwen3_5_35b_a3b_0404}
+project_name=${PROJECT_NAME:-verl_sft_qwen3_5_35b_a3b}
 exp_name=${EXP_NAME:-qwen3_5_35b_a3b_megatron_translate_0326-${BACKEND}-tp${TP_SIZE}-pp${PP_SIZE}-ep${EP_SIZE}-etp${ETP_SIZE}-cp${CP_SIZE}}
 ckpts_home=${ckpts_home:-/llm-align/liuchonghan/ckpt_verl/sft/${project_name}/${exp_name}}
 
@@ -60,6 +67,11 @@ if [ "${NODE_RANK}" -eq 0 ]; then
     mkdir -p "${ckpts_home}"
 fi
 
+if [ "${PAD_MODE}" != "no_padding" ]; then
+    echo "ERROR: PAD_MODE must be no_padding for Qwen3.5 megatron bshd path."
+    exit 1
+fi
+
 if [ "${EP_SIZE}" -lt 1 ] || [ "${ETP_SIZE}" -lt 1 ]; then
     echo "ERROR: EP_SIZE and ETP_SIZE must be >= 1."
     exit 1
@@ -67,7 +79,8 @@ fi
 
 export WANDB_MODE=${WANDB_MODE:-offline}
 export NCCL_DEBUG=WARN
-export NCCL_IB_DISABLE=${NCCL_IB_DISABLE:-0}
+export NCCL_IB_DISABLE=${NCCL_IB_DISABLE:-1}
+export NCCL_NET=${NCCL_NET:-Socket}
 export NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME:-eth0}
 export GLOO_SOCKET_IFNAME=${GLOO_SOCKET_IFNAME:-${NCCL_SOCKET_IFNAME}}
 export PYTORCH_ALLOC_CONF=expandable_segments:True
@@ -131,7 +144,7 @@ ENGINE_CONFIG="\
     engine.use_mbridge=True \
     engine.vanilla_mbridge=True \
     engine.dtype=${DTYPE} \
-    engine.use_remove_padding=${USE_REMOVE_PADDING} \
+    engine.use_remove_padding=False \
     engine.override_transformer_config.attention_backend=auto \
     +engine.override_transformer_config.recompute_method=uniform \
     +engine.override_transformer_config.recompute_granularity=full \
@@ -157,7 +170,7 @@ torchrun \
     data.num_workers=${NUM_WORKERS} \
     data.messages_key=messages \
     model.path=${MODEL_PATH} \
-    model.use_remove_padding=${USE_REMOVE_PADDING} \
+    model.use_remove_padding=False \
     model.trust_remote_code=True \
     +model.override_config.output_router_logits=${OUTPUT_ROUTER_LOGITS} \
     +model.override_config.router_dtype="${ROUTER_DTYPE}" \
