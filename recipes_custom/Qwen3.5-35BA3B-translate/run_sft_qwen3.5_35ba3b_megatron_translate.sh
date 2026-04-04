@@ -2,16 +2,16 @@
 set -xeuo pipefail
 
 NUM_GPUS=${NUM_GPUS:-8}
-NNODES=${WORLD_SIZE:-${NNODES:-2}}
-NODE_RANK=${RANK:-${NODE_RANK:-0}}
+NNODES=${NNODES:-4}
+NODE_RANK=${NODE_RANK:-${RANK:-0}}
 MASTER_PORT=${MASTER_PORT:-8888}
 
 RAW_MASTER_ADDR=${MASTER_ADDR:-127.0.0.1}
 MASTER_ADDR=$(python3 -c "import socket; print(socket.getaddrinfo('${RAW_MASTER_ADDR}', None, socket.AF_INET)[0][4][0])" 2>/dev/null || echo "${RAW_MASTER_ADDR}")
 
-TRAIN_FILES=${TRAIN_FILES:-"[/llm-align/liuchonghan/ins_dataset/ins_dataset/dayuzhong/lowest_metricx_train_selected.cleaned.messages.parquet]"}
+TRAIN_FILES=${TRAIN_FILES:-"[/llm-align/liuchonghan/ins_dataset/ins_dataset/dayuzhong/dayuzhong_instruct_gemini3.1_5w_messages.parquet]"}
 
-MODEL_PATH=${MODEL_PATH:-/llm-align/open_models/Qwen3.5/Qwen3.5-35B-A3B}
+MODEL_PATH=${MODEL_PATH:-/llm-align/liuchonghan/ckpt_verl/sft/verl_sft_qwen3_5_35b_a3b/qwen3_5_35b_a3b_megatron_translate_0326-megatron-tp2-pp4-ep2-etp2-cp1/global_step_39000/huggingface}
 
 TP_SIZE=${TP_SIZE:-2}
 PP_SIZE=${PP_SIZE:-4}
@@ -20,7 +20,7 @@ CP_SIZE=${CP_SIZE:-1}
 EP_SIZE=${EP_SIZE:-2}
 ETP_SIZE=${ETP_SIZE:-2}
 
-TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-16}
+TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-32}
 MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-1}
 MAX_LENGTH=${MAX_LENGTH:-2048}
 MAX_TOKEN_LEN_PER_GPU=${MAX_TOKEN_LEN_PER_GPU:-${MAX_LENGTH}}
@@ -40,7 +40,7 @@ MOE_Z_LOSS_COEFF=${MOE_Z_LOSS_COEFF:-}
 BACKEND=megatron
 RESUME_MODE=${RESUME_MODE:-disable}
 
-project_name=${PROJECT_NAME:-verl_sft_qwen3_5_35b_a3b}
+project_name=${PROJECT_NAME:-verl_sft_qwen3_5_35b_a3b_0404}
 exp_name=${EXP_NAME:-qwen3_5_35b_a3b_megatron_translate_0326-${BACKEND}-tp${TP_SIZE}-pp${PP_SIZE}-ep${EP_SIZE}-etp${ETP_SIZE}-cp${CP_SIZE}}
 ckpts_home=${ckpts_home:-/llm-align/liuchonghan/ckpt_verl/sft/${project_name}/${exp_name}}
 
