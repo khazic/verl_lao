@@ -24,13 +24,14 @@ TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-8}
 MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-1}
 MAX_LENGTH=${MAX_LENGTH:-1024}
 MAX_TOKEN_LEN_PER_GPU=${MAX_TOKEN_LEN_PER_GPU:-${MAX_LENGTH}}
-PAD_MODE=${PAD_MODE:-no_padding}
+PAD_MODE=${PAD_MODE:-right}
 TRUNCATION=${TRUNCATION:-right}
 NUM_WORKERS=${NUM_WORKERS:-1}
 LR=${LR:-5e-6}
 MIN_LR=${MIN_LR:-5e-7}
 DTYPE=${DTYPE:-bfloat16}
 TOTAL_EPOCHS=${TOTAL_EPOCHS:-1}
+USE_REMOVE_PADDING=${USE_REMOVE_PADDING:-true}
 OUTPUT_ROUTER_LOGITS=${OUTPUT_ROUTER_LOGITS:-True}
 ROUTER_DTYPE=${ROUTER_DTYPE:-float32}
 MOE_ROUTER_LOAD_BALANCING_TYPE=${MOE_ROUTER_LOAD_BALANCING_TYPE:-}
@@ -57,12 +58,6 @@ echo ">>> 通信信息: MASTER ${MASTER_ADDR} : ${MASTER_PORT}"
 
 if [ "${NODE_RANK}" -eq 0 ]; then
     mkdir -p "${ckpts_home}"
-fi
-
-# Qwen3.5 GDN + megatron bshd path currently requires no_padding + static bsz.
-if [ "${PAD_MODE}" != "no_padding" ]; then
-    echo "ERROR: PAD_MODE must be no_padding for Qwen3.5 megatron bshd path."
-    exit 1
 fi
 
 if [ "${EP_SIZE}" -lt 1 ] || [ "${ETP_SIZE}" -lt 1 ]; then
@@ -99,7 +94,6 @@ mkdir -p /llm-align/liuchonghan/tmp \
          /llm-align/liuchonghan/xdg_cache
 
 # Key settings:
-#   engine.use_remove_padding=False   - keep bshd path instead of THD
 #   engine.vanilla_mbridge=True       - use mbridge (not megatron-bridge)
 MOE_TRANSFORMER_CONFIG=""
 if [ -n "${MOE_ROUTER_LOAD_BALANCING_TYPE}" ]; then
@@ -137,7 +131,7 @@ ENGINE_CONFIG="\
     engine.use_mbridge=True \
     engine.vanilla_mbridge=True \
     engine.dtype=${DTYPE} \
-    engine.use_remove_padding=False \
+    engine.use_remove_padding=${USE_REMOVE_PADDING} \
     engine.override_transformer_config.attention_backend=auto \
     +engine.override_transformer_config.recompute_method=uniform \
     +engine.override_transformer_config.recompute_granularity=full \
@@ -163,7 +157,7 @@ torchrun \
     data.num_workers=${NUM_WORKERS} \
     data.messages_key=messages \
     model.path=${MODEL_PATH} \
-    model.use_remove_padding=False \
+    model.use_remove_padding=${USE_REMOVE_PADDING} \
     model.trust_remote_code=True \
     +model.override_config.output_router_logits=${OUTPUT_ROUTER_LOGITS} \
     +model.override_config.router_dtype="${ROUTER_DTYPE}" \
