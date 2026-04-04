@@ -637,11 +637,12 @@ def postprocess_bshd_engine(
     """
     Postprocess bshd sequences
     """
+    if not post_process:
+        return output
+
     assert output.shape[:2] == attention_mask.shape, (
         f"output.shape: {output.shape}, attention_mask.shape: {attention_mask.shape}"
     )
-    if not post_process:
-        return output
 
     if is_npu_available:
         attention_mask = attention_mask.diagonal(dim1=-2, dim2=-1).squeeze(1)
