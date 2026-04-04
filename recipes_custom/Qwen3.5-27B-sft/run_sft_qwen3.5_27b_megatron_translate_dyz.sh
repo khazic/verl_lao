@@ -21,8 +21,8 @@ CP_SIZE=${CP_SIZE:-1}
 EP_SIZE=${EP_SIZE:-1}
 ETP_SIZE=${ETP_SIZE:-1}
 
-TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-64}
-MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-2}
+TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-128}
+MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-4}
 MAX_LENGTH=${MAX_LENGTH:-4096}
 MAX_TOKEN_LEN_PER_GPU=${MAX_TOKEN_LEN_PER_GPU:-${MAX_LENGTH}}
 PAD_MODE=${PAD_MODE:-no_padding}
@@ -38,7 +38,7 @@ echo ">>> 数据文件: ${TRAIN_FILES}, total_epochs=${TOTAL_EPOCHS}"
 BACKEND=megatron
 RESUME_MODE=${RESUME_MODE:-disable}
 
-project_name=verl_sft_qwen3_5_27b_megatron_translate_0330_dyz
+project_name=verl_sft_qwen3_5_27b_megatron_translate_0404_dyz
 exp_name=qwen3_5_27b_megatron_translate_0325-${BACKEND}-tp${TP_SIZE}-pp${PP_SIZE}-cp${CP_SIZE}
 ckpts_home=${ckpts_home:-/llm-align/liuchonghan/ckpt_verl/sft/${project_name}/${exp_name}}
 
