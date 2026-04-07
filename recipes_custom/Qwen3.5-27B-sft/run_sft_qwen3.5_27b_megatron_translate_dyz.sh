@@ -10,7 +10,7 @@ MASTER_PORT=${MASTER_PORT:-8888}
 RAW_MASTER_ADDR=${MASTER_ADDR:-127.0.0.1}
 MASTER_ADDR=$(python3 -c "import socket; print(socket.getaddrinfo('${RAW_MASTER_ADDR}', None, socket.AF_INET)[0][4][0])" 2>/dev/null || echo "${RAW_MASTER_ADDR}")
 
-TRAIN_FILES=${TRAIN_FILES:-"[/llm-align/liuchonghan/ins_dataset/ins_dataset/dayuzhong/dayuzhong_instruct_gemini3.1_5w_messages.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/dayuzhong/dyz_trans_10w_gemini3.1.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/dayuzhong/lowest_metricx_train_selected.cleaned.messages.parquet]"}
+TRAIN_FILES=${TRAIN_FILES:-"[/llm-align/liuchonghan/ins_dataset/ins_dataset/dayuzhong/dayuzhong_instruct_gemini3.1_5w.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/dayuzhong/dyz_trans_10w_gemini3.1.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/dayuzhong/lowest_metricx_train_selected.cleaned.messages.parquet]"}
 
 MODEL_PATH=${MODEL_PATH:-/llm-align/liuchonghan/ckpt_verl/sft/verl_sft_qwen3_5_27b_megatron_translate_0330_dyz/qwen3_5_27b_megatron_translate_0325-megatron-tp4-pp1-cp1/global_step_3000/huggingface}
 
