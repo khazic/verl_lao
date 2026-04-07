@@ -70,8 +70,8 @@ NODE_RANK=${RANK:-0}
 MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"} 
 MASTER_PORT=${MASTER_PORT:-23457} 
 
-LAUNCH_DIR=${LAUNCH_DIR:-${PWD}}
 LAUNCH_SCRIPT_DIR=$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+LAUNCH_DIR=${LAUNCH_DIR:-${LAUNCH_SCRIPT_DIR}}
 # shellcheck source=/dev/null
 source "${LAUNCH_SCRIPT_DIR}/../common_launch_logging.sh"
 init_launch_logging "$0" "${exp_name}" "${NODE_RANK:-0}" "${LAUNCH_DIR}"

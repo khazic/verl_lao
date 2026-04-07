@@ -52,8 +52,8 @@ project_name=${PROJECT_NAME:-verl_sft_qwen3_5_35b_a3b}
 exp_name=${EXP_NAME:-qwen3_5_35b_a3b_megatron_translate_0407-${BACKEND}-tp${TP_SIZE}-pp${PP_SIZE}-ep${EP_SIZE}-etp${ETP_SIZE}-cp${CP_SIZE}}
 ckpts_home=${ckpts_home:-/llm-align/liuchonghan/ckpt_verl/sft/${project_name}/${exp_name}}
 
-LAUNCH_DIR=${LAUNCH_DIR:-${PWD}}
 LAUNCH_SCRIPT_DIR=$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+LAUNCH_DIR=${LAUNCH_DIR:-${LAUNCH_SCRIPT_DIR}}
 # shellcheck source=/dev/null
 source "${LAUNCH_SCRIPT_DIR}/../common_launch_logging.sh"
 init_launch_logging "$0" "${exp_name}" "${NODE_RANK:-0}" "${LAUNCH_DIR}"
