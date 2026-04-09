@@ -49,7 +49,7 @@ BACKEND=megatron
 RESUME_MODE=${RESUME_MODE:-disable}
 
 project_name=${PROJECT_NAME:-verl_sft_qwen3_5_35b_a3b}
-exp_name=${EXP_NAME:-qwen3_5_35b_a3b_megatron_translate_0407-${BACKEND}-tp${TP_SIZE}-pp${PP_SIZE}-ep${EP_SIZE}-etp${ETP_SIZE}-cp${CP_SIZE}}
+exp_name=${EXP_NAME:-qwen3_5_35b_a3b_megatron_translate_0409-${BACKEND}-tp${TP_SIZE}-pp${PP_SIZE}-ep${EP_SIZE}-etp${ETP_SIZE}-cp${CP_SIZE}}
 ckpts_home=${ckpts_home:-/llm-align/liuchonghan/ckpt_verl/sft/${project_name}/${exp_name}}
 
 LAUNCH_SCRIPT_DIR=$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)
