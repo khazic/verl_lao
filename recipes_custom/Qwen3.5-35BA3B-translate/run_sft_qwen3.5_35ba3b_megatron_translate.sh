@@ -19,7 +19,7 @@ MASTER_ADDR=$(python3 -c "import socket; print(socket.getaddrinfo('${RAW_MASTER_
 
 TRAIN_FILES=${TRAIN_FILES:-"[/llm-align/liuchonghan/ins_dataset/ins_dataset/dayuzhong/dayuzhong_instruct_gemini3.1_5w.parquet,/llm-align/liuchonghan/ins_dataset/ins_dataset/dayuzhong/dyz_trans_10w_gemini3.1.parquet]"}
 
-MODEL_PATH=${MODEL_PATH:-/llm-align/liuchonghan/ckpt_verl/sft/verl_sft_qwen3_5_35b_a3b/qwen3_5_35b_a3b_megatron_translate_0326-megatron-tp2-pp4-ep2-etp2-cp1/global_step_39000/huggingface}
+MODEL_PATH=${MODEL_PATH:-/llm-align/open_models/Qwen3.5/Qwen3.5-35B-A3B}
 
 TP_SIZE=${TP_SIZE:-2}
 PP_SIZE=${PP_SIZE:-4}
