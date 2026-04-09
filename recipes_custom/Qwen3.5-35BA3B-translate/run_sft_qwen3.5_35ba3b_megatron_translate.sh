@@ -3,10 +3,10 @@ set -xeuo pipefail
 
 NUM_GPUS=${NUM_GPUS:-8}
 # Normalize user-provided launch arguments first, then clear platform-injected
-# distributed env vars so this script behaves predictably for manual 4-node runs.
+# distributed env vars so this script behaves predictably for manual 8-node runs.
 USER_MASTER_ADDR=${MASTER_ADDR:-127.0.0.1}
 USER_MASTER_PORT=${MASTER_PORT:-8888}
-USER_NNODES=${NNODES:-4}
+USER_NNODES=${NNODES:-8}
 USER_NODE_RANK=${NODE_RANK:-${RANK:-0}}
 unset WORLD_SIZE RANK LOCAL_RANK GROUP_RANK ROLE_RANK LOCAL_WORLD_SIZE
 
