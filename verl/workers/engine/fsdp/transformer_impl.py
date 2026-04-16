@@ -1008,6 +1008,7 @@ class FSDPEngineWithLMHead(FSDPEngine):
                 if mm_token_type_ids is not None:
                     if mm_token_type_ids.dim() != 1:
                         mm_token_type_ids = mm_token_type_ids.reshape(-1)
+                    mm_token_type_ids = mm_token_type_ids.to(device=input_offsets.device)
                     mm_token_type_ids = torch.nested.nested_tensor_from_jagged(
                         mm_token_type_ids, input_offsets
                     )
