@@ -90,6 +90,12 @@ def parse_args():
         help="score the first N requests with an eager HF forward pass as well and "
         "report the largest disagreement. Run this once before trusting a go/no-go",
     )
+    ap.add_argument(
+        "--reference-dtype",
+        default="float32",
+        help="dtype of the HF reference backend. float32 by default because bfloat16 "
+        "scoring noise is larger than the backend gap being measured",
+    )
     ap.add_argument("--dry-run", action="store_true", help="build requests and report cost, then stop")
     return ap.parse_args()
 
@@ -157,7 +163,7 @@ def main():
     backend_gap = None
     if args.check_backend_agreement:
         n = min(args.check_backend_agreement, len(book.pairs))
-        reference = HFBackend(args.model).score(book.pairs[:n])
+        reference = HFBackend(args.model, dtype=args.reference_dtype).score(book.pairs[:n])
         backend_gap = max_abs_disagreement(scores[:n], reference)
         print(f"[check] max |vLLM - HF| mean log-prob over {n} requests: {backend_gap:.5f}")
 

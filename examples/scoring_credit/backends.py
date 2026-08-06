@@ -100,10 +100,10 @@ class VLLMBackend:
 class HFBackend:
     """Reference span scoring with a plain Hugging Face forward pass."""
 
-    # batch_size defaults to 1 so the reference path involves no padding at all.
-    # This backend exists to adjudicate disagreements, so it is worth more as an
-    # obviously-correct implementation than as a fast one.
-    def __init__(self, model: str, device: str = "cuda", dtype: str = "bfloat16", batch_size: int = 1):
+    # Defaults chosen so the reference is trustworthy rather than fast: float32
+    # because bfloat16 log-prob scoring carries more numerical noise than the gap
+    # being adjudicated, and batch_size 1 so no padding is involved at all.
+    def __init__(self, model: str, device: str = "cuda", dtype: str = "float32", batch_size: int = 1):
         import torch
         from transformers import AutoModelForCausalLM
 

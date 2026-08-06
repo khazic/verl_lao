@@ -81,6 +81,29 @@ the trainer's `compute_log_prob` are different code. If they disagree, an offlin
 decision does not transfer to training. `--check-backend-agreement` measures the
 gap once so you can stop worrying about it.
 
+### The scoring noise floor is not negligible
+
+Measured on Qwen3-0.6B over the example trajectories, as the largest absolute
+difference in mean log-prob per token:
+
+| comparison | max abs difference |
+|---|---|
+| HF bfloat16 vs HF float32 | 0.236 |
+| vLLM vs HF bfloat16 | 0.213 |
+| vLLM vs HF float32 | 0.105 |
+| vLLM prefix caching on vs off | 0.075 |
+
+Three things follow. Reference scoring runs in float32 by default, since a
+bfloat16 reference is noisier than the disagreement it is supposed to
+adjudicate, and vLLM turns out to sit closer to float32 than a naive bfloat16
+forward pass does. Prefix caching perturbs the numbers slightly; it stays on
+because it is what makes the ablation variants affordable, but it is not free.
+Most importantly, every credit `c_t` must be read against this floor: on a small
+model, differences of a few tenths of a nat per token are indistinguishable from
+arithmetic. Measure the floor for your own model with
+`--check-backend-agreement` before interpreting any credit ranking, and prefer
+summed over per-token quantities where the target span is long.
+
 ### What the summary reports
 
 `<out>.summary.json` uses keys named after the paper's table columns:
