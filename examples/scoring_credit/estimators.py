@@ -77,19 +77,58 @@ def as_token_ids(result) -> list[int]:
     return result
 
 
+def resolve_template_kwargs(chat_template: str | None, thinking: str) -> dict:
+    """Extra apply_chat_template kwargs, chiefly to disable a model's thinking mode.
+
+    Both estimators score a target immediately after the generation prompt. On a
+    hybrid-thinking model that position is where the policy expects to open a
+    reasoning block, so almost all of its probability mass sits on the thinking
+    token and the target's log-probability measures willingness to skip thinking
+    rather than belief in the target. Measured on Qwen3-8B, closing the thinking
+    block moves the probe by 1.8 nats per token and removes a large source of
+    variance that has nothing to do with the turn being ablated.
+
+    ``auto`` disables thinking whenever the template mentions it, which is the
+    right default because every quantity this recipe computes is a difference of
+    log-probabilities at that exact position.
+    """
+    if thinking == "on":
+        return {}
+    if thinking == "off":
+        return {"enable_thinking": False}
+    if thinking != "auto":
+        raise ValueError(f"unknown thinking mode {thinking!r}")
+    return {"enable_thinking": False} if chat_template and "enable_thinking" in chat_template else {}
+
+
 class ChatRenderer:
     """Renderer backed by a Hugging Face tokenizer's chat template."""
 
-    def __init__(self, tokenizer):
+    def __init__(self, tokenizer, thinking: str = "auto"):
         self.tokenizer = tokenizer
+        self.template_kwargs = resolve_template_kwargs(getattr(tokenizer, "chat_template", None), thinking)
 
     def render(self, messages: list[Message], add_generation_prompt: bool) -> list[int]:
         return as_token_ids(
-            self.tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=add_generation_prompt)
+            self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=True,
+                add_generation_prompt=add_generation_prompt,
+                **self.template_kwargs,
+            )
         )
 
     def encode(self, text: str) -> list[int]:
         return as_token_ids(self.tokenizer.encode(text, add_special_tokens=False))
+
+    def generation_prompt_tail(self, n_chars: int = 120) -> str:
+        """Rendered tail at which targets get scored, for logging.
+
+        This bug was invisible in every summary statistic, so the scoring
+        position is printed on every run and recorded in the output.
+        """
+        ids = self.render([{"role": "user", "content": "x"}], add_generation_prompt=True)
+        return self.tokenizer.decode(ids)[-n_chars:]
 
 
 class RequestBook:

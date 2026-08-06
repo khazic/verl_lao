@@ -82,6 +82,16 @@ def parse_args():
     )
     ap.add_argument("--kappa", type=float, default=1.0, help="softmax temperature used for weight-share metrics")
     ap.add_argument("--phi-floor", type=float, default=-6.0, help="potential floor, in mean log-prob per token")
+    ap.add_argument(
+        "--thinking",
+        choices=["auto", "off", "on"],
+        default="auto",
+        help="how to handle a hybrid-thinking policy. Targets are scored right after "
+        "the generation prompt, which on such a model is where it expects to open a "
+        "reasoning block, so leaving thinking enabled measures willingness to skip "
+        "thinking rather than belief in the target. auto disables it when the chat "
+        "template supports it",
+    )
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument(
         "--check-backend-agreement",
@@ -125,7 +135,10 @@ def main():
 
     from transformers import AutoTokenizer
 
-    renderer = ChatRenderer(AutoTokenizer.from_pretrained(args.model))
+    renderer = ChatRenderer(AutoTokenizer.from_pretrained(args.model), thinking=args.thinking)
+    tail = renderer.generation_prompt_tail()
+    print(f"[template] thinking={args.thinking} kwargs={renderer.template_kwargs}")
+    print(f"[template] targets are scored at: ...{tail!r}")
     probes = PROBE_ENSEMBLE[: max(1, args.probe_ensemble)]
     modes = tuple(args.modes)
     controls = tuple(args.controls)
@@ -207,6 +220,9 @@ def main():
         "kappa": args.kappa,
         "phi_floor": args.phi_floor,
         "seed": args.seed,
+        "thinking": args.thinking,
+        "template_kwargs": renderer.template_kwargs,
+        "generation_prompt_tail": tail,
         "n_skipped_inputs": len(skipped),
         "backend_max_disagreement": backend_gap,
         "backend_check_error": backend_error,

@@ -41,6 +41,7 @@ from examples.scoring_credit.estimators import (
     assemble,
     build_requests,
     exact_shapley,
+    resolve_template_kwargs,
     softmax_weights,
 )
 from examples.scoring_credit.trajectories import Trajectory, group_turns
@@ -500,3 +501,25 @@ def test_yes_no_questions_are_dropped_from_the_provenance_construction():
     assert build_pair(record, random.Random(0), n_distractors=1, fail=True) is None
     kept = build_pair(record, random.Random(0), n_distractors=1, fail=True, require_unique_mention=False)
     assert kept is not None and kept[0]["answer_given"] == "no"
+
+
+# --------------------------------------------------------------------------
+# Thinking-mode handling
+# --------------------------------------------------------------------------
+
+THINKING_TEMPLATE = "{% if enable_thinking %}<think>{% endif %}{{ messages }}"
+PLAIN_TEMPLATE = "{{ messages }}"
+
+
+def test_thinking_is_disabled_only_when_the_template_supports_it():
+    """Scoring happens where a hybrid model would open a reasoning block."""
+    assert resolve_template_kwargs(THINKING_TEMPLATE, "auto") == {"enable_thinking": False}
+    assert resolve_template_kwargs(PLAIN_TEMPLATE, "auto") == {}
+    assert resolve_template_kwargs(None, "auto") == {}
+
+
+def test_thinking_mode_can_be_forced_either_way():
+    assert resolve_template_kwargs(PLAIN_TEMPLATE, "off") == {"enable_thinking": False}
+    assert resolve_template_kwargs(THINKING_TEMPLATE, "on") == {}
+    with pytest.raises(ValueError):
+        resolve_template_kwargs(PLAIN_TEMPLATE, "sometimes")
