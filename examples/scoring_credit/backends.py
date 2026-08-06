@@ -100,7 +100,10 @@ class VLLMBackend:
 class HFBackend:
     """Reference span scoring with a plain Hugging Face forward pass."""
 
-    def __init__(self, model: str, device: str = "cuda", dtype: str = "bfloat16", batch_size: int = 4):
+    # batch_size defaults to 1 so the reference path involves no padding at all.
+    # This backend exists to adjudicate disagreements, so it is worth more as an
+    # obviously-correct implementation than as a fast one.
+    def __init__(self, model: str, device: str = "cuda", dtype: str = "bfloat16", batch_size: int = 1):
         import torch
         from transformers import AutoModelForCausalLM
 
@@ -127,9 +130,13 @@ class HFBackend:
                 attn[row, width - len(seq) :] = 1
             input_ids = input_ids.to(self.device)
             attn = attn.to(self.device)
+            # Position ids must be derived from the mask, not left implicit. The
+            # default arange would start counting inside the left padding, which
+            # shifts every rotary position and silently changes the log-probs.
+            position_ids = (attn.cumsum(dim=-1) - 1).clamp(min=0)
 
             with torch.no_grad():
-                logits = self.model(input_ids=input_ids, attention_mask=attn).logits
+                logits = self.model(input_ids=input_ids, attention_mask=attn, position_ids=position_ids).logits
             logprobs = torch.log_softmax(logits.float(), dim=-1)
 
             for row, (_, tgt) in enumerate(chunk):
