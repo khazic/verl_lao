@@ -57,6 +57,26 @@ class Renderer(Protocol):
     def encode(self, text: str) -> list[int]: ...
 
 
+def as_token_ids(result) -> list[int]:
+    """Normalize a tokenizer's output to a flat list of token ids.
+
+    ``apply_chat_template(tokenize=True)`` returns a plain list on transformers 4
+    and a ``BatchEncoding`` on transformers 5, and either may be batched one level
+    deep. Everything downstream concatenates and hashes these sequences, so a
+    wrong type does not fail loudly: it collapses the deduplication key and
+    silently reduces the whole run to a handful of requests.
+    """
+    if hasattr(result, "input_ids"):  # BatchEncoding
+        result = result.input_ids
+    elif isinstance(result, dict):
+        result = result["input_ids"]
+    if isinstance(result, list) and len(result) == 1 and isinstance(result[0], list):
+        result = result[0]  # batched output for a single conversation
+    if not isinstance(result, list) or any(not isinstance(t, int) for t in result):
+        raise TypeError(f"expected a flat list of token ids, got {type(result).__name__}")
+    return result
+
+
 class ChatRenderer:
     """Renderer backed by a Hugging Face tokenizer's chat template."""
 
@@ -64,10 +84,12 @@ class ChatRenderer:
         self.tokenizer = tokenizer
 
     def render(self, messages: list[Message], add_generation_prompt: bool) -> list[int]:
-        return self.tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=add_generation_prompt)
+        return as_token_ids(
+            self.tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=add_generation_prompt)
+        )
 
     def encode(self, text: str) -> list[int]:
-        return self.tokenizer.encode(text, add_special_tokens=False)
+        return as_token_ids(self.tokenizer.encode(text, add_special_tokens=False))
 
 
 class RequestBook:
@@ -84,6 +106,12 @@ class RequestBook:
         self.keys: dict = {}
 
     def add(self, key, context: list[int], target: list[int]) -> None:
+        # Guard the deduplication key. Anything other than a list of ints would
+        # still hash, so a tokenizer returning a different type would quietly
+        # merge unrelated requests instead of raising.
+        for name, seq in (("context", context), ("target", target)):
+            if not isinstance(seq, list) or any(not isinstance(t, int) for t in seq):
+                raise TypeError(f"{name} must be a list of token ids, got {type(seq).__name__}")
         signature = (tuple(context), tuple(target))
         slot = self._index.get(signature)
         if slot is None:

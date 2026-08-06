@@ -36,6 +36,7 @@ from examples.scoring_credit.analysis import (
 from examples.scoring_credit.backends import SpanScore
 from examples.scoring_credit.estimators import (
     RequestBook,
+    as_token_ids,
     assemble,
     build_requests,
     exact_shapley,
@@ -364,3 +365,42 @@ def test_correlation_helpers():
     assert spearman([1, 2, 3, 4], [4, 3, 2, 1]) == pytest.approx(-1.0)
     # y is a pure function of the control, so nothing survives partialling out.
     assert partial_spearman([1, 2, 3, 4, 5], [1, 2, 3, 4, 5], [[1, 2, 3, 4, 5]]) is None
+
+
+# --------------------------------------------------------------------------
+# Tokenizer output shapes across transformers versions
+# --------------------------------------------------------------------------
+
+
+class _BatchEncodingLike:
+    """Stands in for the object transformers 5 returns from apply_chat_template."""
+
+    def __init__(self, input_ids):
+        self.input_ids = input_ids
+
+    def __getitem__(self, key):
+        return {"input_ids": self.input_ids}[key]
+
+
+def test_token_id_normalization_across_tokenizer_return_types():
+    assert as_token_ids([1, 2, 3]) == [1, 2, 3]
+    assert as_token_ids([[1, 2, 3]]) == [1, 2, 3]
+    assert as_token_ids({"input_ids": [1, 2, 3]}) == [1, 2, 3]
+    assert as_token_ids(_BatchEncodingLike([1, 2, 3])) == [1, 2, 3]
+    assert as_token_ids(_BatchEncodingLike([[1, 2, 3]])) == [1, 2, 3]
+
+
+def test_non_token_id_sequences_are_rejected_rather_than_hashed():
+    """A wrong type must raise, not collapse the deduplication key.
+
+    transformers 5 changed apply_chat_template to return a BatchEncoding. Because
+    that object still hashes, an unguarded request book merged every request into
+    a handful of entries and the run completed with silently wrong output.
+    """
+    with pytest.raises(TypeError):
+        as_token_ids("not tokens")
+    book = RequestBook()
+    with pytest.raises(TypeError):
+        book.add("k", _BatchEncodingLike([1, 2]), [3])
+    with pytest.raises(TypeError):
+        book.add("k", [1, 2], "3")
