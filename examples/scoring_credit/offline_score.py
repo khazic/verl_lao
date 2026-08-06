@@ -91,6 +91,13 @@ def parse_args():
         "report the largest disagreement. Run this once before trusting a go/no-go",
     )
     ap.add_argument(
+        "--reference-device",
+        default="cpu",
+        help="device for the HF reference backend. CPU by default: it scores only a "
+        "small sample, and a float32 copy of the policy does not fit alongside the "
+        "vLLM engine that is already holding the GPU",
+    )
+    ap.add_argument(
         "--reference-dtype",
         default="float32",
         help="dtype of the HF reference backend. float32 by default because bfloat16 "
@@ -160,13 +167,10 @@ def main():
     elapsed = time.time() - started
     print(f"[score] {len(scores)} requests in {elapsed:.1f}s ({total_tokens / max(elapsed, 1e-9) / 1e3:.1f}k tok/s)")
 
-    backend_gap = None
-    if args.check_backend_agreement:
-        n = min(args.check_backend_agreement, len(book.pairs))
-        reference = HFBackend(args.model, dtype=args.reference_dtype).score(book.pairs[:n])
-        backend_gap = max_abs_disagreement(scores[:n], reference)
-        print(f"[check] max |vLLM - HF| mean log-prob over {n} requests: {backend_gap:.5f}")
-
+    # Persist before anything optional runs. The scoring pass is the expensive
+    # part of the job, and an auxiliary diagnostic must never be able to discard
+    # it: an earlier version ran the reference check first and lost eighteen
+    # minutes of completed work when that check hit an out-of-memory error.
     resolved = book.resolve(scores)
     scored = [
         assemble(traj, layouts[traj.idx], resolved, modes=modes, controls=controls)
@@ -177,6 +181,20 @@ def main():
     with open(f"{args.out}.jsonl", "w") as handle:
         for record in scored:
             handle.write(json.dumps(asdict(record)) + "\n")
+    print(f"[write] {len(scored)} scored trajectories -> {args.out}.jsonl")
+
+    backend_gap, backend_error = None, None
+    if args.check_backend_agreement:
+        n = min(args.check_backend_agreement, len(book.pairs))
+        try:
+            reference = HFBackend(args.model, device=args.reference_device, dtype=args.reference_dtype).score(
+                book.pairs[:n]
+            )
+            backend_gap = max_abs_disagreement(scores[:n], reference)
+            print(f"[check] max |vLLM - HF| mean log-prob over {n} requests: {backend_gap:.5f}")
+        except Exception as exc:  # diagnostic only; never fatal
+            backend_error = f"{type(exc).__name__}: {exc}"
+            print(f"[check] reference backend unavailable, skipping: {backend_error}")
 
     summary = summarize(scored, modes=modes, controls=controls, kappa=args.kappa, phi_floor=args.phi_floor)
     summary["config"] = {
@@ -191,6 +209,7 @@ def main():
         "seed": args.seed,
         "n_skipped_inputs": len(skipped),
         "backend_max_disagreement": backend_gap,
+        "backend_check_error": backend_error,
         "scoring_seconds": elapsed,
         "unique_requests": len(book),
         "scored_tokens": total_tokens,
