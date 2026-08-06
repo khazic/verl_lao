@@ -34,6 +34,7 @@ from examples.scoring_credit.analysis import (
     spearman,
 )
 from examples.scoring_credit.backends import SpanScore
+from examples.scoring_credit.build_multihop import RESTATEMENT_OBSERVATION, build_pair
 from examples.scoring_credit.estimators import (
     RequestBook,
     as_token_ids,
@@ -404,3 +405,100 @@ def test_non_token_id_sequences_are_rejected_rather_than_hashed():
         book.add("k", _BatchEncodingLike([1, 2]), [3])
     with pytest.raises(TypeError):
         book.add("k", [1, 2], "3")
+
+
+# --------------------------------------------------------------------------
+# Multi-hop trajectory construction
+# --------------------------------------------------------------------------
+
+DECISIVE = "The Spree flows through the centre of Berlin."
+
+
+def hotpot_record(answer: str = "Spree") -> dict:
+    """A record shaped like HotpotQA's distractor configuration."""
+    return {
+        "id": "q1",
+        "question": "Which river runs through the 1936 Olympic host city?",
+        "answer": answer,
+        "supporting_facts": {"title": ["Berlin", "Spree"], "sent_id": [0, 0]},
+        "context": {
+            "title": ["Berlin", "Spree", "Munich", "Danube", "Rhine"],
+            "sentences": [
+                ["Berlin hosted the 1936 Summer Olympics."],
+                ["The Spree flows through the centre of Berlin.", "It is a tributary."],
+                ["Munich is in Bavaria."],
+                ["The Danube flows through Vienna."],
+                ["The Rhine flows through Cologne."],
+            ],
+        },
+    }
+
+
+def test_pair_differs_only_by_the_restatement_turn():
+    """The provenance comparison is only valid if nothing else varies."""
+    base, restated = build_pair(hotpot_record(), random.Random(0), n_distractors=2, fail=False)
+    b = Trajectory(idx=0, messages=base["messages"], y_star=base["y_star"], success=True)
+    r = Trajectory(idx=1, messages=restated["messages"], y_star=restated["y_star"], success=True)
+    assert r.n_turns == b.n_turns + 1
+    slot = restated["restatement_turn"]
+    without = r.turns[:slot] + r.turns[slot + 1 :]
+    assert without == b.turns
+
+
+def test_annotated_indices_match_the_tool_turn_segmentation():
+    """Builder indices and group_turns must agree, or every metric is off by one."""
+    base, restated = build_pair(hotpot_record(), random.Random(3), n_distractors=2, fail=False)
+    for row in (base, restated):
+        traj = Trajectory(idx=0, messages=row["messages"], y_star=row["y_star"], success=True)
+        assert traj.validate() is None
+        origin_turn = traj.turns[row["origin_turn"]]
+        assert DECISIVE in " ".join(m["content"] for m in origin_turn)
+        for gold in row["gold_turns"]:
+            assert traj.turns[gold][0]["role"] == "assistant"
+    slot = restated["restatement_turn"]
+    r = Trajectory(idx=0, messages=restated["messages"], y_star=restated["y_star"], success=True)
+    assert DECISIVE in r.turns[slot][0]["content"]
+    assert slot > restated["origin_turn"]
+
+
+def test_restatement_adds_no_new_information():
+    _, restated = build_pair(hotpot_record(), random.Random(5), n_distractors=2, fail=False)
+    turn = Trajectory(idx=0, messages=restated["messages"], y_star="Spree", success=True).turns[
+        restated["restatement_turn"]
+    ]
+    assert turn[1]["content"] == RESTATEMENT_OBSERVATION
+
+
+def test_failed_trajectory_keeps_the_correct_probe_target():
+    """y_star is the known-correct outcome even when the trajectory answered wrongly."""
+    base, _ = build_pair(hotpot_record(), random.Random(1), n_distractors=2, fail=True)
+    assert base["success"] is False
+    assert base["y_star"] == "Spree"
+    assert base["answer_given"] != "Spree"
+    assert base["messages"][-1]["content"] == base["answer_given"]
+
+
+def test_records_without_a_locatable_answer_are_skipped():
+    record = hotpot_record(answer="Thames")  # appears in no supporting sentence
+    assert build_pair(record, random.Random(0), n_distractors=2, fail=False) is None
+
+
+def test_yes_no_questions_get_the_opposite_answer_on_failure():
+    base, _ = build_pair(
+        {
+            **hotpot_record(),
+            "answer": "yes",
+            "context": {
+                "title": ["Berlin", "Spree", "Munich"],
+                "sentences": [
+                    ["Berlin hosted the 1936 Summer Olympics, yes."],
+                    ["The Spree flows through the centre of Berlin, yes."],
+                    ["Munich is in Bavaria."],
+                ],
+            },
+        },
+        random.Random(0),
+        n_distractors=1,
+        fail=True,
+    )
+    assert base["answer_given"] == "no"
