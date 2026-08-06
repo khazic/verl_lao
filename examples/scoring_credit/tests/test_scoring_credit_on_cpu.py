@@ -483,22 +483,20 @@ def test_records_without_a_locatable_answer_are_skipped():
     assert build_pair(record, random.Random(0), n_distractors=2, fail=False) is None
 
 
-def test_yes_no_questions_get_the_opposite_answer_on_failure():
-    base, _ = build_pair(
-        {
-            **hotpot_record(),
-            "answer": "yes",
-            "context": {
-                "title": ["Berlin", "Spree", "Munich"],
-                "sentences": [
-                    ["Berlin hosted the 1936 Summer Olympics, yes."],
-                    ["The Spree flows through the centre of Berlin, yes."],
-                    ["Munich is in Bavaria."],
-                ],
-            },
+def test_yes_no_questions_are_dropped_from_the_provenance_construction():
+    """A yes/no answer has no locatable decisive mention, so origin_turn is meaningless."""
+    record = {
+        **hotpot_record(),
+        "answer": "yes",
+        "context": {
+            "title": ["Berlin", "Spree", "Munich"],
+            "sentences": [
+                ["Berlin hosted the 1936 Summer Olympics, yes."],
+                ["The Spree flows through the centre of Berlin, yes."],
+                ["Munich is in Bavaria."],
+            ],
         },
-        random.Random(0),
-        n_distractors=1,
-        fail=True,
-    )
-    assert base["answer_given"] == "no"
+    }
+    assert build_pair(record, random.Random(0), n_distractors=1, fail=True) is None
+    kept = build_pair(record, random.Random(0), n_distractors=1, fail=True, require_unique_mention=False)
+    assert kept is not None and kept[0]["answer_given"] == "no"

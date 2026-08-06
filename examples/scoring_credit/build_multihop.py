@@ -113,25 +113,49 @@ def _turn(intent: str, observation: str) -> list[dict]:
     ]
 
 
-def build_pair(record: dict, rng: random.Random, *, n_distractors: int, fail: bool) -> list[dict] | None:
+def build_pair(
+    record: dict,
+    rng: random.Random,
+    *,
+    n_distractors: int,
+    fail: bool,
+    require_unique_mention: bool = True,
+) -> list[dict] | None:
     """Build the base and restated trajectories for one question.
 
     Returns None when the record lacks the structure the studies require, which
     is preferable to emitting a trajectory whose ground truth is a guess.
     """
     context = record["context"]
+    answer = str(record["answer"])
     gold_titles = list(dict.fromkeys(record["supporting_facts"]["title"]))
     gold_titles = [t for t in gold_titles if t in context["title"]]
     if len(gold_titles) < 2:
         return None
 
-    distractor_titles = [t for t in context["title"] if t not in gold_titles]
-    rng.shuffle(distractor_titles)
-    distractor_titles = distractor_titles[:n_distractors]
+    # Yes/no answers have no locatable decisive mention: the answer string matches
+    # any sentence that happens to contain the word, so neither the origin turn nor
+    # the single-mention premise means anything. Such questions are fine for the
+    # probe study but cannot support provenance, so they are dropped with it.
+    if require_unique_mention and answer.lower() in ("yes", "no"):
+        return None
+
+    def mentions_answer(title: str) -> bool:
+        return _sentence_containing(_sentences_of(context, title), answer) is not None
+
+    # The base trajectory is supposed to state the decisive fact exactly once, so
+    # that the restated variant is the only one containing a repetition. Retrieved
+    # distractors that happen to mention the answer would break that premise, and
+    # they are common: a third of HotpotQA questions have the answer string in more
+    # than one paragraph of the distractor set.
+    candidates = [t for t in context["title"] if t not in gold_titles]
+    if require_unique_mention:
+        candidates = [t for t in candidates if not mentions_answer(t)]
+    rng.shuffle(candidates)
+    distractor_titles = candidates[:n_distractors]
     if not distractor_titles:
         return None
 
-    answer = str(record["answer"])
     # The decisive paragraph is the supporting one that actually states the
     # answer; without it there is nothing for a restatement to repeat.
     decisive_title, decisive_sentence = None, None
@@ -141,6 +165,12 @@ def build_pair(record: dict, rng: random.Random, *, n_distractors: int, fail: bo
             decisive_title, decisive_sentence = title, sentence
             break
     if decisive_title is None:
+        return None
+
+    # If the other supporting paragraph states the answer too, the question
+    # itself carries the redundancy and no amount of distractor filtering fixes
+    # it. Such records cannot serve the provenance study at all.
+    if require_unique_mention and any(t != decisive_title and mentions_answer(t) for t in gold_titles):
         return None
 
     # Order the searches so the decisive one is never last: a restatement has to
@@ -178,11 +208,15 @@ def build_pair(record: dict, rng: random.Random, *, n_distractors: int, fail: bo
         messages.extend(answer_turn)
         return messages
 
+    # Recorded so the single-mention premise can be audited after the fact rather
+    # than trusted: any base trajectory with more than one is contaminated.
+    answer_mentions = sum(1 for title in ordered if mentions_answer(title))
     common = {
         "question_id": record.get("id"),
         "y_star": answer,
         "success": not fail,
         "answer_given": final_answer,
+        "answer_mentions": answer_mentions,
     }
 
     base = {
@@ -228,6 +262,14 @@ def parse_args():
         help="share of questions whose trajectory ends in a wrong answer, so the "
         "probe study has both classes and blame assignment has failures to rank",
     )
+    ap.add_argument(
+        "--allow-repeated-mentions",
+        action="store_true",
+        help="keep questions whose answer appears in more than one retrieved "
+        "paragraph. Off by default: such a base trajectory already contains a "
+        "repetition, which is precisely what the restated variant is supposed to "
+        "be alone in having",
+    )
     ap.add_argument("--seed", type=int, default=0)
     return ap.parse_args()
 
@@ -247,7 +289,13 @@ def main():
     for record in dataset:
         if len({r["pair_id"] for r in written}) >= args.limit:
             break
-        pair = build_pair(record, rng, n_distractors=args.distractors, fail=rng.random() < args.failure_rate)
+        pair = build_pair(
+            record,
+            rng,
+            n_distractors=args.distractors,
+            fail=rng.random() < args.failure_rate,
+            require_unique_mention=not args.allow_repeated_mentions,
+        )
         if pair is None:
             skipped += 1
             continue
@@ -264,6 +312,8 @@ def main():
     print(f"[build] skipped {skipped} records lacking usable ground truth")
     print(f"[build] success {successes} / failure {len(written) - successes}")
     print(f"[build] turns per trajectory: {sorted(turn_counts.items())}")
+    contaminated = sum(1 for r in written if r["variant"] == "base" and r["answer_mentions"] > 1)
+    print(f"[build] base trajectories mentioning the answer more than once: {contaminated}")
 
 
 if __name__ == "__main__":
