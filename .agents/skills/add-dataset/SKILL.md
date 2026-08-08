@@ -164,7 +164,7 @@ See the `/add-reward` skill for details.
 ## Key Requirements
 
 1. **Fixed schema**: All required fields must be present (see above)
-2. **Parquet format**: veRL's `RLDataset` expects `.parquet` files
+2. **Parquet format**: veRL's `RLHFDataset` expects `.parquet` files
 3. **data_source matches**: Must align with your reward function's dispatch key
 4. **Prompt as chat messages**: Use list-of-dicts format, not a raw string
 
@@ -182,7 +182,7 @@ See the `/add-reward` skill for details.
 Location: .agents/skills/add-dataset/SKILL.md
 
 ## How to Update
-- When RLDataset schema changes: update Required Schema section
+- When RLHFDataset schema changes: update Required Schema section
 - When new reference datasets added: update table
 ================================================================================
 -->

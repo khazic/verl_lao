@@ -129,7 +129,7 @@ main()
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.4 \
-    reward_model.reward_manager=naive \
+    reward.reward_manager.name=naive \
     trainer.total_epochs=15 \
     trainer.project_name=<name>_trainer \
     trainer.experiment_name=qwen2-7b-gsm8k

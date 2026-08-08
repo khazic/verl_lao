@@ -17,16 +17,27 @@ This skill is triggered when:
 
 ## Overview
 
-veRL separates reward functions into two layers:
+Reward computation runs through **Reward Loop**
+(`verl/experimental/reward_loop/`), the default reward implementation. A
+`RewardLoopManager` launches `reward.num_workers` `RewardLoopWorker` actors across
+the cluster; each worker owns one `RewardManager` and scores samples concurrently
+with `asyncio`. The pre-Reward-Loop implementation under
+`verl/workers/reward_manager/` is still shipped for backward compatibility (see
+the `legacy_reward_impl` config group), but new reward code should target Reward
+Loop.
 
-1. **`compute_score` function** (`verl/utils/reward_score/<name>.py`) — pure Python,
-   takes decoded strings and returns a float score
-2. **`RewardManager`** (`verl/workers/reward_manager/`) — wraps compute_score, handles
-   batching, decoding, and DataProto interface
+There are two layers:
 
-For most use cases, you only need to implement a `compute_score` function and register
-it. A custom `RewardManager` is only needed for advanced use cases (e.g., remote reward
-models, PRIME).
+1. **`compute_score` function** — pure Python, takes decoded strings and returns
+   a float (or a dict carrying a `score` key). It may be **sync or async**; the
+   type is detected automatically and sync functions run in an executor.
+2. **`RewardManager`** (`verl/experimental/reward_loop/reward_manager/`) — wraps
+   `compute_score` and implements `async run_single(data) -> dict`, handling
+   decoding and the DataProto interface.
+
+For most use cases you only need a `compute_score` function. A custom
+`RewardManager` is only needed for advanced cases (rate-limited APIs, remote
+CPU-heavy verifiers, reward models).
 
 ## Step-by-Step Guide
 
@@ -47,15 +58,19 @@ import re
 from typing import Any
 
 
-def compute_score(solution_str: str, ground_truth: Any) -> float:
+def compute_score(data_source: str, solution_str: str, ground_truth: Any, extra_info=None) -> float:
     """Compute reward score for a single completion.
 
     Args:
-        solution_str: Decoded model output string (prompt + completion).
+        data_source: Dataset identifier carried on the sample.
+        solution_str: Decoded model response (the completion only, special tokens stripped).
         ground_truth: Ground truth answer from the dataset.
+        extra_info: Per-sample dict; Reward Loop also injects `num_turns` and
+            `rollout_reward_scores`.
 
     Returns:
-        Float score, typically in [0.0, 1.0].
+        Float score, typically in [0.0, 1.0]. A dict with a `score` key is also
+        accepted; its remaining keys are surfaced as `reward_extra_info`.
     """
     try:
         answer = _extract_answer(solution_str)
@@ -80,19 +95,39 @@ def _is_correct(predicted: str, ground_truth: str) -> bool:
     return predicted.strip() == ground_truth.strip()
 ```
 
-### Step 2: Register in default_compute_score
+Use `async def compute_score(...)` when scoring involves external API calls or
+sandboxed execution — the worker awaits it directly instead of occupying an
+executor thread, which is significantly more efficient under concurrency.
 
-Update `verl/utils/reward_score/__init__.py` to include your new data source:
+### Step 2: Make the Function Reachable
+
+Two options.
+
+**Option A (no core edit, preferred for project-specific rewards)** — point the
+config at your file:
+
+```bash
+reward.custom_reward_function.path=/path/to/my_reward.py \
+reward.custom_reward_function.name=compute_score
+```
+
+The custom function replaces the default dispatch entirely for every sample.
+
+**Option B (contributing a dataset reward upstream)** — register in
+`verl/utils/reward_score/__init__.py` so `default_compute_score` dispatches on
+`data_source`:
+
+Add an import and one dispatch branch. Leave the existing
+`default_compute_score` signature untouched — it carries extra parameters
+(`sandbox_fusion_url`, `concurrent_semaphore`, `memory_limit_mb`, `**kwargs`) that
+callers rely on:
 
 ```python
 from verl.utils.reward_score.<name> import compute_score as <name>_compute_score
 
-def default_compute_score(data_source, solution_str, ground_truth, extra_info=None, **kwargs):
-    # ... existing cases ...
+# inside default_compute_score, alongside the existing branches:
     elif data_source == "<your_dataset_name>":
         return <name>_compute_score(solution_str, ground_truth)
-    else:
-        raise NotImplementedError(f"Unknown data_source: {data_source}")
 ```
 
 ### Step 3: Set data_source in Dataset Preprocessing
@@ -120,69 +155,70 @@ def make_map_fn(split):
 
 ### Step 4: Wire into Training Config
 
-In your training script (e.g., `examples/grpo_trainer/run_qwen2-7b_math.sh`):
+Reward settings live under the `reward` config group
+(`verl/trainer/config/reward/reward.yaml`):
 
 ```bash
-# Use NaiveRewardManager (default) with your compute_score
-reward_model.reward_manager=naive
+reward.reward_manager.name=naive \
+reward.num_workers=8
 ```
 
-Or in the Python trainer config:
-
-```python
-# Trainer will call NaiveRewardManager which calls default_compute_score
-# which dispatches to your function based on data_source
-```
+`reward.num_workers` sets how many reward workers are launched; raise it when
+reward computation, not rollout, is the bottleneck.
 
 ### Step 5 (Optional): Custom RewardManager
 
-Only needed if `NaiveRewardManager` is insufficient (e.g., remote reward model,
-process-level rewards like PRIME). Subclass `AbstractRewardManager`:
+Only needed when the built-in managers are insufficient. Subclass
+`RewardManagerBase` and implement the async `run_single`:
 
 ```python
-from verl.workers.reward_manager import register
-from verl.workers.reward_manager.abstract import AbstractRewardManager
 from verl import DataProto
-import torch
+from verl.experimental.reward_loop.reward_manager import register
+from verl.experimental.reward_loop.reward_manager.base import RewardManagerBase
 
 
 @register("<name>")
-class MyRewardManager(AbstractRewardManager):
-    def __init__(self, tokenizer, num_examine, compute_score=None, reward_fn_key="data_source", **kwargs):
-        self.tokenizer = tokenizer
-        self.num_examine = num_examine
-        self.compute_score = compute_score
+class MyRewardManager(RewardManagerBase):
+    def __init__(self, config, tokenizer, compute_score, **kwargs):
+        super().__init__(config, tokenizer, compute_score)
 
-    def __call__(self, data: DataProto, return_dict: bool = False) -> torch.Tensor:
-        # Decode responses, call compute_score, return reward tensor
-        ...
+    async def run_single(self, data: DataProto) -> dict:
+        data_item = data[-1]  # multi-output trajectories: score the last sequence
+        # Decode the response, call compute_score, and return the score dict.
+        return {"reward_score": score, "reward_extra_info": {}}
 ```
 
-Then reference it in config: `reward_model.reward_manager=<name>`
+Then reference it in config: `reward.reward_manager.name=<name>`.
 
 ## Reference Implementations
 
-| Reward        | File                                     | Description                   |
-| ------------- | ---------------------------------------- | ----------------------------- |
-| GSM8K         | `verl/utils/reward_score/gsm8k.py`       | Math answer extraction        |
-| Math general  | `verl/utils/reward_score/math_reward.py` | LaTeX boxed answer matching   |
-| Geo3K         | `verl/utils/reward_score/geo3k.py`       | Geometry answer verification  |
-| PRIME         | `verl/workers/reward_manager/prime.py`   | Process reward model          |
-| DAPO          | `verl/workers/reward_manager/dapo.py`    | DAPO-style reward shaping     |
+| Reward        | File                                                          | Description                          |
+| ------------- | ------------------------------------------------------------- | ------------------------------------ |
+| GSM8K         | `verl/utils/reward_score/gsm8k.py`                             | Math answer extraction               |
+| Math general  | `verl/utils/reward_score/math_reward.py`                       | LaTeX boxed answer matching          |
+| Geo3K         | `verl/utils/reward_score/geo3k.py`                             | Geometry answer verification         |
+| naive         | `verl/experimental/reward_loop/reward_manager/naive.py`        | Default manager, sync or async score |
+| dapo          | `verl/experimental/reward_loop/reward_manager/dapo.py`         | Overlong reward penalty              |
+| limited       | `verl/experimental/reward_loop/reward_manager/limited.py`      | Caps concurrency for rate-limited APIs |
+| remote        | `verl/experimental/reward_loop/reward_manager/remote.py`       | Separate process for CPU-heavy verifiers |
 
 ## Key Requirements
 
-1. **Return float**: `compute_score` returns a single float per sample
+1. **Return a float or a score dict**: `compute_score` returns one float per
+   sample, or a dict whose `score` key holds it
 2. **No side effects**: Function must be deterministic and stateless
 3. **Handle exceptions**: Return `0.0` on error, do not raise
-4. **data_source matches**: The string in dataset must match the dispatch key in `__init__.py`
+4. **data_source matches**: The string in the dataset must match the dispatch key
+   in `__init__.py` (Option B only)
 
 ## Common Mistakes
 
 - ❌ Raising exceptions inside `compute_score` (causes worker crash)
 - ❌ `data_source` mismatch between dataset and `default_compute_score`
 - ❌ Returning a tensor instead of a float
-- ❌ Assuming solution_str contains only the completion (it includes the prompt too)
+- ❌ Blocking calls (`requests`, `time.sleep`) inside an `async def compute_score`,
+  which stalls every other sample on that worker
+- ❌ Targeting the legacy `verl/workers/reward_manager/` registry for new managers
 
 <!--
 ================================================================================
@@ -192,7 +228,8 @@ Location: .agents/skills/add-reward/SKILL.md
 
 ## How to Update
 - When reward_score API changes: update Step 1 signature
-- When RewardManager API changes: update Step 5
+- When the Reward Loop RewardManager API changes: update Step 5
+- When the reward config group changes: update Step 2 / Step 4 keys
 - When new reference implementations added: update table
 ================================================================================
 -->
