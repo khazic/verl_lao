@@ -28,10 +28,10 @@ Loop.
 
 There are two layers:
 
-1. **`compute_score` function** — pure Python, takes decoded strings and returns
+1. **`compute_score` function**: pure Python, takes decoded strings and returns
    a float (or a dict carrying a `score` key). It may be **sync or async**; the
    type is detected automatically and sync functions run in an executor.
-2. **`RewardManager`** (`verl/experimental/reward_loop/reward_manager/`) — wraps
+2. **`RewardManager`** (`verl/experimental/reward_loop/reward_manager/`): wraps
    `compute_score` and implements `async run_single(data) -> dict`, handling
    decoding and the DataProto interface.
 
@@ -96,14 +96,14 @@ def _is_correct(predicted: str, ground_truth: str) -> bool:
 ```
 
 Use `async def compute_score(...)` when scoring involves external API calls or
-sandboxed execution — the worker awaits it directly instead of occupying an
+sandboxed execution: the worker awaits it directly instead of occupying an
 executor thread, which is significantly more efficient under concurrency.
 
 ### Step 2: Make the Function Reachable
 
 Two options.
 
-**Option A (no core edit, preferred for project-specific rewards)** — point the
+**Option A (no core edit, preferred for project-specific rewards)**: point the
 config at your file:
 
 ```bash
@@ -113,12 +113,12 @@ reward.custom_reward_function.name=compute_score
 
 The custom function replaces the default dispatch entirely for every sample.
 
-**Option B (contributing a dataset reward upstream)** — register in
+**Option B (contributing a dataset reward upstream)**: register in
 `verl/utils/reward_score/__init__.py` so `default_compute_score` dispatches on
 `data_source`:
 
 Add an import and one dispatch branch. Leave the existing
-`default_compute_score` signature untouched — it carries extra parameters
+`default_compute_score` signature untouched: it carries extra parameters
 (`sandbox_fusion_url`, `concurrent_semaphore`, `memory_limit_mb`, `**kwargs`) that
 callers rely on:
 
@@ -188,7 +188,18 @@ class MyRewardManager(RewardManagerBase):
         return {"reward_score": score, "reward_extra_info": {}}
 ```
 
-Then reference it in config: `reward.reward_manager.name=<name>`.
+Then reference it in config: `reward.reward_manager.name=<name>`. The
+`@register` decorator only runs when the module is imported, so a manager kept
+outside the verl tree should be loaded through `importlib` instead:
+
+```bash
+reward.reward_manager.source=importlib \
+reward.reward_manager.module.path=/path/to/my_reward_manager.py \
+reward.reward_manager.name=MyRewardManager
+```
+
+With `source=importlib` the `name` is the class attribute looked up on the
+module, not a registry key.
 
 ## Reference Implementations
 
@@ -199,6 +210,7 @@ Then reference it in config: `reward.reward_manager.name=<name>`.
 | Geo3K         | `verl/utils/reward_score/geo3k.py`                             | Geometry answer verification         |
 | naive         | `verl/experimental/reward_loop/reward_manager/naive.py`        | Default manager, sync or async score |
 | dapo          | `verl/experimental/reward_loop/reward_manager/dapo.py`         | Overlong reward penalty              |
+| gdpo          | `verl/experimental/reward_loop/reward_manager/gdpo.py`         | Multi-reward GDPO scoring            |
 | limited       | `verl/experimental/reward_loop/reward_manager/limited.py`      | Caps concurrency for rate-limited APIs |
 | remote        | `verl/experimental/reward_loop/reward_manager/remote.py`       | Separate process for CPU-heavy verifiers |
 
@@ -229,7 +241,7 @@ Location: .agents/skills/add-reward/SKILL.md
 ## How to Update
 - When reward_score API changes: update Step 1 signature
 - When the Reward Loop RewardManager API changes: update Step 5
-- When the reward config group changes: update Step 2 / Step 4 keys
+- When the reward config group changes: update Step 2 / Step 4 / Step 5 keys
 - When new reference implementations added: update table
 ================================================================================
 -->

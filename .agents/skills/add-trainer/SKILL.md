@@ -22,10 +22,10 @@ veRL follows a **single-controller + Ray workers** architecture:
 ```
 Your Trainer Script (controller, CPU node)
     │
-    ├── ActorRolloutRefWorker  (Ray remote, GPU)  — generates rollouts + computes logprobs
-    ├── CriticWorker           (Ray remote, GPU)  — value estimates (PPO only)
-    ├── RewardModelWorker      (Ray remote, GPU)  — optional RM scoring
-    └── RewardManager          (inline)           — rule-based reward scoring
+    ├── ActorRolloutRefWorker  (Ray remote, GPU): generates rollouts + computes logprobs
+    ├── CriticWorker           (Ray remote, GPU): value estimates (PPO only)
+    ├── RewardModelWorker      (Ray remote, GPU): optional RM scoring
+    └── RewardLoopWorker       (Ray remote, CPU): reward scoring via RewardManager
 ```
 
 The controller drives the training loop by calling `.generate_sequences()`,
@@ -61,7 +61,7 @@ examples/<name>_trainer/
 
 ### Step 3: Implement the Trainer Class
 
-**Option A — new advantage estimator (recommended for most cases)**
+**Option A: new advantage estimator (recommended for most cases)**
 
 Advantage computation is handled by a standalone `compute_advantage()` function in
 `ray_trainer.py`, not a method. The correct extension point is `register_adv_est`:
@@ -88,7 +88,7 @@ def compute_<name>_advantage(token_level_rewards, response_mask, config, **kwarg
     return advantages, returns
 ```
 
-**Option B — structural trainer changes**
+**Option B: structural trainer changes**
 
 Only subclass `RayPPOTrainer` if you need to change the overall training loop
 (e.g., add a second optimizer step, change data flow). Override `fit()` directly:
@@ -105,7 +105,7 @@ class MyTrainer(RayPPOTrainer):
 
 ### Step 4: Write Run Script
 
-**Option A** — custom advantage estimator: import your module first so
+**Option A**: custom advantage estimator: import your module first so
 `@register_adv_est` executes, then call the standard entry point:
 
 ```bash
