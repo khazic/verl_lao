@@ -288,7 +288,7 @@ def glm4v_attn_forward(
     position_embeddings: Optional[tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46
     **kwargs,
 ) -> tuple[torch.Tensor, None, None]:
-    from transformers.models.glm4v.modeling_glm4v import apply_multimodal_rotary_pos_emb, repeat_kv
+    from transformers.models.glm4v.modeling_glm4v import apply_rotary_pos_emb, repeat_kv
 
     bsz, q_len, _ = hidden_states.size()  # q_len = seq_length / sp_size
     query_states = self.q_proj(hidden_states)  # (batch_size, seq_length / sp_size, num_heads * head_size)
@@ -300,10 +300,10 @@ def glm4v_attn_forward(
     value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
 
     # Because the input can be padded, the absolute sequence length depends on the max position id.
+    # Glm4vTextRotaryEmbedding already folds mrope_section into cos/sin, so this is the plain
+    # application, exactly as Glm4vTextAttention.forward does it.
     cos, sin = position_embeddings
-    query_states, key_states = apply_multimodal_rotary_pos_emb(
-        query_states, key_states, cos, sin, self.rope_scaling["mrope_section"]
-    )
+    query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
     key_states = repeat_kv(key_states, self.num_key_value_groups)
     value_states = repeat_kv(value_states, self.num_key_value_groups)
     dropout_rate = 0.0 if not self.training else self.attention_dropout
@@ -382,7 +382,7 @@ def _get_input_embeds(
         pixel_values = torch.zeros((16, 1176), dtype=inputs_embeds.dtype, device=inputs_embeds.device)
         image_grid_thw = torch.tensor([[1, 4, 4]], dtype=torch.long, device=inputs_embeds.device)
         image_embeds = model.visual(pixel_values, grid_thw=image_grid_thw)
-        inputs_embeds += 0.0 * image_embeds.mean()
+        inputs_embeds = inputs_embeds + 0.0 * image_embeds.mean()
 
     if attention_mask is not None:
         attention_mask = attention_mask.to(inputs_embeds.device)
@@ -470,6 +470,7 @@ def forward_with_torch_backend(
     input_ids: torch.LongTensor = None,
     labels: Optional[torch.LongTensor] = None,
     temperature: float = 1.0,
+    shift_labels: Optional[torch.LongTensor] = None,
     **kwargs,
 ) -> tuple | Glm4vCausalLMOutputForPPO:
     from verl.utils.experimental.torch_functional import FusedLinearForPPO
@@ -477,15 +478,18 @@ def forward_with_torch_backend(
     outputs = glm4v_forward(self, input_ids, **kwargs)
     hidden_states = outputs[0]
 
-    # Loss calculations
-    if labels is not None:
+    # See `dense_common.forward_with_torch_backend` for the `shift_labels`
+    # rationale (issue #6068).
+    if shift_labels is not None:
+        rolled_labels = shift_labels
+    elif labels is not None:
         rolled_labels = torch.roll(labels, shifts=-1, dims=-1)
     elif input_ids is not None:
         rolled_labels = torch.roll(input_ids, shifts=-1, dims=-1)
     else:
         raise RuntimeError("To use forward_with_torch_backend, either labels or input_ids must be provided.")
 
-    fused_linear_for_ppo = FusedLinearForPPO()
+    fused_linear_for_ppo = FusedLinearForPPO(impl_backend=getattr(self, "_verl_fused_kernels_backend", "torch"))
     log_probs, entropy = fused_linear_for_ppo.forward(
         hidden_states=hidden_states,
         vocab_weights=self.lm_head.weight,
@@ -504,6 +508,7 @@ def forward_with_triton_backend(
     input_ids: torch.LongTensor = None,
     labels: Optional[torch.LongTensor] = None,
     temperature: float = 1.0,
+    shift_labels: Optional[torch.LongTensor] = None,
     **kwargs,
 ) -> tuple | Glm4vCausalLMOutputForPPO:
     from verl.utils.kernel.linear_cross_entropy import linear_cross_entropy
@@ -511,8 +516,11 @@ def forward_with_triton_backend(
     outputs = glm4v_forward(self, input_ids, **kwargs)
     hidden_states = outputs[0]
 
-    # Loss calculations
-    if labels is not None:
+    # See `dense_common.forward_with_torch_backend` for the `shift_labels`
+    # rationale (issue #6068).
+    if shift_labels is not None:
+        rolled_labels = shift_labels
+    elif labels is not None:
         rolled_labels = torch.roll(labels, shifts=-1, dims=-1)
     elif input_ids is not None:
         rolled_labels = torch.roll(input_ids, shifts=-1, dims=-1)

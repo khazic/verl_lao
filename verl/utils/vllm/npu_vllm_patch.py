@@ -15,149 +15,145 @@
 # limitations under the License.
 
 
+import inspect
+import logging
 import os
+from contextvars import ContextVar
 from functools import wraps
 
 from verl.utils.device import is_torch_npu_available
 
+logger = logging.getLogger(__name__)
 
-def vllm_ascend_v011_select_moe_comm_method_wrapper(fn):
-    @wraps(fn)
-    def wrapper(self, num_tokens, with_prefill):
-        moe_comm_method = fn(self, num_tokens, with_prefill)
-        from vllm_ascend.ascend_forward_context import MoECommType
-        from vllm_ascend.utils import AscendSocVersion, enable_sp, get_ascend_soc_version
-
-        soc_version = get_ascend_soc_version()
-
-        # AscendSocVersion.A2 is not support MC2 in Single-card multi-process scenario now.
-        if soc_version in {AscendSocVersion.A2} and moe_comm_method == MoECommType.MC2:
-            quant_type = getattr(self.vllm_config.model_config.hf_config, "moe_quantize", None)
-            # Currently, w4a8_dynamic does not support allgatherep
-            if quant_type == "w4a8_dynamic":
-                moe_comm_method = MoECommType.ALLTOALL
-            else:
-                moe_comm_method = MoECommType.ALLGATHER
-
-        if with_prefill:
-            if enable_sp():
-                moe_comm_method = MoECommType.ALLGATHER
-            else:
-                moe_comm_method = MoECommType.NAIVE_MULTICAST
-
-        return moe_comm_method
-
-    return wrapper
+_GLM52_PATCH_ENV = "VERL_VLLM_ASCEND_GLM52_PATCH"
+_GLM52_PATCH_TRUTHY_VALUES = {"1", "true", "yes"}
+_GLM52_PATCH_MARKER = "_verl_vllm_ascend_glm52_patched"
 
 
-def vllm_ascend_v011_matmul_and_reduce_wrapper(fn):
-    @wraps(fn)
-    def wrapper(self, *args, **kwargs):
-        from vllm_ascend.utils import AscendSocVersion, get_ascend_soc_version
-
-        soc_version = get_ascend_soc_version()
-        # AscendSocVersion.A2 is not support MC2 in Single-card multi-process scenario now.
-        if soc_version in {AscendSocVersion.A2}:
-            from vllm.forward_context import get_forward_context
-
-            try:
-                forward_context = get_forward_context()
-                forward_context.mmrs_fusion = False
-            except AssertionError:
-                # forward_context.mmrs_fusion will be false in matmul_and_reduce func.
-                pass
-        return fn(self, *args, **kwargs)
-
-    return wrapper
+def _glm52_patch_enabled() -> bool:
+    return os.getenv(_GLM52_PATCH_ENV, "").strip().lower() in _GLM52_PATCH_TRUTHY_VALUES
 
 
-def check_vllm_ascend_before_server_launch():
-    import torch_npu
-    import vllm
-
-    def _is_ascend_soc_version_A2_v011_local():
-        from vllm_ascend.utils import AscendSocVersion
-
-        soc_version = torch_npu.npu.get_soc_version()
-        if 220 <= soc_version <= 225:
-            _ascend_soc_version = AscendSocVersion.A2
-        elif 250 <= soc_version <= 255:
-            _ascend_soc_version = AscendSocVersion.A3
-        else:
-            _ascend_soc_version = AscendSocVersion.UNDEFINED
-
-        return _ascend_soc_version == AscendSocVersion.A2
-
-    def _is_ascend_soc_version_A2_v013_local():
-        from vllm_ascend.utils import AscendDeviceType
-
-        soc_version = torch_npu.npu.get_soc_version()
-        if 220 <= soc_version <= 225:
-            cur_device_type = AscendDeviceType.A2
-        elif 250 <= soc_version <= 255:
-            cur_device_type = AscendDeviceType.A3
-        elif 200 <= soc_version <= 205:
-            cur_device_type = AscendDeviceType._310P
-        elif soc_version == 260:
-            cur_device_type = AscendDeviceType.A5
-        else:
-            raise RuntimeError(f"Can not support soc_version: {soc_version}.")
-
-        return cur_device_type == AscendDeviceType.A2
-
-    if vllm.__version__ == "0.11.0":
-        is_A2 = _is_ascend_soc_version_A2_v011_local()
-    elif vllm.__version__ == "0.13.0":
-        is_A2 = _is_ascend_soc_version_A2_v013_local()
-    else:
-        is_A2 = False
-
-    if is_A2:
-        VLLM_ASCEND_ENABLE_MATMUL_ALLREDUCE = bool(int(os.getenv("VLLM_ASCEND_ENABLE_MATMUL_ALLREDUCE", "0")))
-        if VLLM_ASCEND_ENABLE_MATMUL_ALLREDUCE:
-            raise AssertionError(
-                "AscendSocVersion.A2 is not support VLLM_ASCEND_ENABLE_MATMUL_ALLREDUCE \
-                in Single-card multi-process scenario now. "
-            )
+def _normalized_source(fn) -> str:
+    try:
+        return "".join(inspect.getsource(fn).split())
+    except (OSError, TypeError) as exc:
+        raise RuntimeError(f"{_GLM52_PATCH_ENV} requires inspectable vllm-ascend 0.23.x Python sources.") from exc
 
 
-def vllm_ascend_v013_select_moe_comm_method_wrapper(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        moe_comm_method = fn(*args, **kwargs)
-        from vllm_ascend.ascend_forward_context import MoECommType
-        from vllm_ascend.utils import AscendDeviceType, get_ascend_device_type
+def _patch_glm52_ascend_rms_norm(layernorm_module) -> bool:
+    ascend_rms_norm = layernorm_module.AscendRMSNorm
+    original_forward = ascend_rms_norm.forward_oot
+    if getattr(original_forward, _GLM52_PATCH_MARKER, False):
+        return False
 
-        ascend_device_type = get_ascend_device_type()
+    source = _normalized_source(original_forward)
+    if "residual=x+residual" in source and "npu_rms_norm(residual,self.weight" in source:
+        return False
+    if "npu_add_rms_norm" not in source:
+        raise RuntimeError(f"{_GLM52_PATCH_ENV} found an unsupported AscendRMSNorm.forward_oot implementation.")
 
-        # AscendSocVersion.A2 is not support MC2 in Single-card multi-process scenario now.
-        if ascend_device_type in {AscendDeviceType.A2} and moe_comm_method == MoECommType.MC2:
-            moe_comm_method = MoECommType.ALLGATHER
+    @wraps(original_forward)
+    def patched_forward(self, x, residual=None):
+        if residual is None:
+            return original_forward(self, x, residual)
 
-        return moe_comm_method
+        import torch_npu
 
-    return wrapper
+        residual = layernorm_module.torch.ops.vllm.maybe_chunk_residual(x, residual)
+        residual = x + residual
+        x = torch_npu.npu_rms_norm(residual, self.weight, epsilon=self.variance_epsilon)[0]
+        return x, residual
+
+    setattr(patched_forward, _GLM52_PATCH_MARKER, True)
+    ascend_rms_norm.forward_oot = patched_forward
+    return True
 
 
-def vllm_ascend_v013_matmul_and_reduce_wrapper(fn):
-    @wraps(fn)
-    def wrapper(self, *args, **kwargs):
-        from vllm_ascend.utils import AscendDeviceType, get_ascend_device_type
+def _patch_glm52_sfa_kv_b_proj_disposal(sfa_module) -> bool:
+    ascend_sfa_impl = sfa_module.AscendSFAImpl
+    original_process_weights = ascend_sfa_impl.process_weights_after_loading
+    if getattr(original_process_weights, _GLM52_PATCH_MARKER, False):
+        return False
 
-        ascend_device_type = get_ascend_device_type()
-        # AscendSocVersion.A2 is not support MC2 in Single-card multi-process scenario now.
-        if ascend_device_type in {AscendDeviceType.A2}:
-            from vllm.forward_context import get_forward_context
+    source = _normalized_source(original_process_weights)
+    if "dispose_layer(self.kv_b_proj)" not in source:
+        return False
 
-            try:
-                forward_context = get_forward_context()
-                forward_context.mmrs_fusion = False
-            except AssertionError:
-                # forward_context.mmrs_fusion will be false in matmul_and_reduce func.
-                pass
-        return fn(self, *args, **kwargs)
+    original_dispose_layer = sfa_module.dispose_layer
+    no_preserved_layer = object()
+    preserved_layer: ContextVar[object] = ContextVar(
+        "verl_vllm_ascend_glm52_preserved_layer", default=no_preserved_layer
+    )
 
-    return wrapper
+    @wraps(original_dispose_layer)
+    def selective_dispose_layer(layer):
+        if layer is preserved_layer.get():
+            return None
+        return original_dispose_layer(layer)
+
+    @wraps(original_process_weights)
+    def patched_process_weights(self, act_dtype):
+        token = preserved_layer.set(self.kv_b_proj)
+        try:
+            return original_process_weights(self, act_dtype)
+        finally:
+            preserved_layer.reset(token)
+
+    setattr(patched_process_weights, _GLM52_PATCH_MARKER, True)
+    sfa_module.dispose_layer = selective_dispose_layer
+    ascend_sfa_impl.process_weights_after_loading = patched_process_weights
+    return True
+
+
+def _patch_glm52_sfa_indexer_scale(sfa_module) -> bool:
+    indexer_post_process = sfa_module.AscendSFAImpl.indexer_select_post_process
+    source = _normalized_source(indexer_post_process)
+    scale_expression = "weights=weights*(self.n_head**-0.5)*(self.head_dim**-0.5)"
+    if scale_expression in source:
+        return False
+    if "weights=kw[:,self.head_dim:]" not in source or "DeviceOperator.indexer_select_post_process" not in source:
+        raise RuntimeError(
+            f"{_GLM52_PATCH_ENV} found an unsupported AscendSFAImpl.indexer_select_post_process implementation."
+        )
+
+    device_operator = sfa_module.DeviceOperator
+    original_operator = device_operator.indexer_select_post_process
+    if getattr(original_operator, _GLM52_PATCH_MARKER, False):
+        return False
+
+    parameter_names = tuple(inspect.signature(original_operator).parameters)
+    expected_prefix = ("sfa_impl", "q_li", "q_li_scale", "q_li_shape_ori", "weights")
+    if parameter_names[: len(expected_prefix)] != expected_prefix:
+        raise RuntimeError(
+            f"{_GLM52_PATCH_ENV} found an unsupported DeviceOperator.indexer_select_post_process signature."
+        )
+
+    @wraps(original_operator)
+    def patched_operator(sfa_impl, q_li, q_li_scale, q_li_shape_ori, weights, *args, **kwargs):
+        weights = weights * (sfa_impl.n_head**-0.5) * (sfa_impl.head_dim**-0.5)
+        return original_operator(sfa_impl, q_li, q_li_scale, q_li_shape_ori, weights, *args, **kwargs)
+
+    setattr(patched_operator, _GLM52_PATCH_MARKER, True)
+    device_operator.indexer_select_post_process = staticmethod(patched_operator)
+    return True
+
+
+def patch_vllm_ascend_glm52() -> None:
+    """Apply the vllm-ascend GLM-5.2 fixes from commit ca0420391."""
+    try:
+        from vllm_ascend.attention import sfa_v1
+        from vllm_ascend.ops import layernorm
+    except (AttributeError, ImportError) as exc:
+        raise RuntimeError(f"{_GLM52_PATCH_ENV} could not load the required vllm-ascend 0.23.x patch targets.") from exc
+
+    patched = [
+        _patch_glm52_ascend_rms_norm(layernorm),
+        _patch_glm52_sfa_kv_b_proj_disposal(sfa_v1),
+        _patch_glm52_sfa_indexer_scale(sfa_v1),
+    ]
+    status = "applied" if any(patched) else "already present"
+    logger.info("GLM-5.2 vllm-ascend compatibility patch %s", status)
 
 
 def vllm_v013_weight_loader_method_wrapper(fn):
@@ -170,6 +166,28 @@ def vllm_v013_weight_loader_method_wrapper(fn):
         return fn(self, param, loaded_weight, weight_name, shard_id, expert_id, return_success)
 
     return wrapper
+
+
+def _patch_legacy_fused_moe_weight_loader(fused_moe) -> bool:
+    """Install the NPU transpose wrapper on vLLM's legacy FusedMoE class.
+
+    Legacy vLLM releases expose ``FusedMoE`` as a class whose
+    ``weight_loader`` can be wrapped at class level. Modular vLLM releases
+    expose ``FusedMoE`` as a factory function, so this class-level patch is
+    not applicable. Loader and layout handling for constructed modules is
+    owned by their runtime and backend-specific weight-loading paths.
+    """
+    weight_loader = getattr(fused_moe, "weight_loader", None)
+    if not isinstance(fused_moe, type) or not callable(weight_loader):
+        return False
+
+    if getattr(weight_loader, "_verl_npu_weight_loader_patched", False):
+        return True
+
+    wrapped_weight_loader = vllm_v013_weight_loader_method_wrapper(weight_loader)
+    wrapped_weight_loader._verl_npu_weight_loader_patched = True
+    fused_moe.weight_loader = wrapped_weight_loader
+    return True
 
 
 def patch_vllm013_rotary_emb():
@@ -189,39 +207,46 @@ def patch_vllm013_rotary_emb():
     ApplyRotaryEmb.__init__ = vllm013_npu_rotary_embedding_init_impl
 
 
-if is_torch_npu_available(check_device=False):
-    import vllm
-    from packaging import version
+def patch_camem_sleep() -> None:
+    """Synchronize pending NPU work before CaMem sleep unmaps tensor memory."""
+    try:
+        import vllm_ascend.device_allocator.camem as camem
+    except ModuleNotFoundError as exc:
+        if exc.name in ("vllm_ascend", "vllm_ascend.device_allocator", "vllm_ascend.device_allocator.camem"):
+            return
+        raise
 
-    _VLLM_VERSION = version.parse(vllm.__version__)
-    if _VLLM_VERSION >= version.parse("0.13.0") and _VLLM_VERSION <= version.parse("0.14.0"):
-        # Disable flash_attn in RotaryEmbedding (NPU) when VLLM >= 0.13
-        from vllm.model_executor.layers.fused_moe import FusedMoE
+    original_sleep = camem.CaMemAllocator.sleep
+    if getattr(original_sleep, "_verl_camem_sleep_patched", False):
+        return
 
-        patch_vllm013_rotary_emb()
-        FusedMoE.weight_loader = vllm_v013_weight_loader_method_wrapper(FusedMoE.weight_loader)
+    @wraps(original_sleep)
+    def patched_sleep(self, *args, **kwargs):
+        # Graph replay and normal NPU launches are asynchronous. All users of
+        # the virtual mappings must finish before sleep calls unmap_and_release;
+        # synchronizing via empty_cache() after the unmap loop is too late.
+        camem.torch.npu.synchronize()
+        return original_sleep(self, *args, **kwargs)
 
-    VERL_NPU_ENABLE_A2_PATCH_VLLM_ASCEND_MC2 = bool(int(os.getenv("VERL_NPU_ENABLE_A2_PATCH_VLLM_ASCEND_MC2", "1")))
-    if VERL_NPU_ENABLE_A2_PATCH_VLLM_ASCEND_MC2:
-        # only support vllm 0.13 and 0.11 now.
-        if _VLLM_VERSION >= version.parse("0.13.0") and _VLLM_VERSION <= version.parse("0.14.0"):
-            from vllm_ascend import ascend_forward_context
-            from vllm_ascend.ops.linear_op import SequenceRowParallelOp
+    patched_sleep._verl_camem_sleep_patched = True
+    camem.CaMemAllocator.sleep = patched_sleep
 
-            ascend_forward_context.select_moe_comm_method = vllm_ascend_v013_select_moe_comm_method_wrapper(
-                ascend_forward_context.select_moe_comm_method
-            )
-            SequenceRowParallelOp.matmul_and_reduce = vllm_ascend_v013_matmul_and_reduce_wrapper(
-                SequenceRowParallelOp.matmul_and_reduce
-            )
 
-        elif _VLLM_VERSION >= version.parse("0.11.0") and _VLLM_VERSION < version.parse("0.13.0"):
-            from vllm_ascend.ops.linear_op import SequenceRowParallelOp
-            from vllm_ascend.worker.model_runner_v1 import NPUModelRunner
+def apply_npu_vllm_patches() -> None:
+    """Apply NPU-specific vLLM patches for weight loading, rotary embedding, and sleep.
 
-            NPUModelRunner._select_moe_comm_method = vllm_ascend_v011_select_moe_comm_method_wrapper(
-                NPUModelRunner._select_moe_comm_method
-            )
-            SequenceRowParallelOp.matmul_and_reduce = vllm_ascend_v011_matmul_and_reduce_wrapper(
-                SequenceRowParallelOp.matmul_and_reduce
-            )
+    Must be called before the vLLM engine is created.
+    """
+    if not is_torch_npu_available(check_device=False):
+        return
+
+    # Disable flash_attn in RotaryEmbedding (NPU)
+    from vllm.model_executor.layers import fused_moe
+
+    patch_vllm013_rotary_emb()
+    _patch_legacy_fused_moe_weight_loader(getattr(fused_moe, "FusedMoE", None))
+    if _glm52_patch_enabled():
+        import vllm_ascend.patch.worker.patch_routed_experts_capture  # noqa: F401
+
+        patch_camem_sleep()
+        patch_vllm_ascend_glm52()

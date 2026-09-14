@@ -19,6 +19,23 @@ Prerequisite:
 
 - a GPU with at least 24 GB HBM
 
+.. note::
+
+   The ``python3`` commands below assume an interpreter that already provides
+   verl — one of the docker images, or an activated ``.venv``. With the uv
+   workflow there is no install step: run them from the repo root behind a
+   ``uv run`` prefix, which builds ``.venv`` from the committed ``uv.lock`` on
+   first use::
+
+       UV_RUN="uv run --frozen --all-packages --extra vllm --extra fsdp"
+       $UV_RUN python3 examples/data_preprocess/gsm8k.py --local_save_dir ~/data/gsm8k
+       $UV_RUN python3 -m verl.trainer.main_ppo ... \
+           ray_kwargs.ray_init.runtime_env.py_executable="${UV_RUN}"
+
+   That last override is what makes Ray start the TaskRunner and every worker
+   actor in the same environment; the ``examples/`` scripts set it for you. See
+   :doc:`Installation<install>` for the full uv workflow.
+
 
 Dataset Introduction
 --------------------
@@ -53,7 +70,7 @@ Step 2: Download a model for post-training
 
 In this example, we start with the ``Qwen2.5-0.5B-Instruct`` model.
 
-If you want to perform SFT before RL, refer to the :doc:`Complete GSM8K Example<../examples/gsm8k_example>`, the `sft directory <https://github.com/volcengine/verl/blob/main/examples/sft/gsm8k>`_ and `SFT Trainer <https://github.com/volcengine/verl/blob/main/verl/trainer/sft_trainer.py>`_ for further details.
+If you want to perform SFT before RL, refer to the :doc:`Complete GSM8K Example<../examples/gsm8k_example>`, the `sft directory <https://github.com/verl-project/verl/blob/main/examples/sft/gsm8k>`_ and `SFT Trainer <https://github.com/verl-project/verl/blob/main/verl/trainer/sft_trainer.py>`_ for further details.
 
 .. code-block:: bash
 
@@ -70,7 +87,7 @@ answer from both the solution and model's output using regular
 expression matching. We assign a reward of 1 to correct
 answer, 0.0 to incorrect answer and 0 to no answer. 
 
-For more details, please refer to `verl/utils/reward_score/gsm8k.py <https://github.com/volcengine/verl/blob/v0.4.1/verl/utils/reward_score/gsm8k.py>`_.
+For more details, please refer to `verl/utils/reward_score/gsm8k.py <https://github.com/verl-project/verl/blob/v0.4.1/verl/utils/reward_score/gsm8k.py>`_.
 
 **Training Script**
 
@@ -148,4 +165,4 @@ For the full set of configs, please refer to :ref:`config-explain-page` for deta
 
 
 .. [1] The original paper (https://arxiv.org/pdf/2110.14168) mainly focuses on training a verifier (a reward model) to solve math problems via Best-of-N sampling. In this example, we train an RL agent using a rule-based reward model.
-.. [2] More training script examples for FSDP and Megatron-LM backend are stored in `examples/ppo_trainer <https://github.com/volcengine/verl/tree/main/examples/ppo_trainer>`_ directory.
+.. [2] More training script examples for FSDP and Megatron-LM backend are stored in `examples/ppo_trainer <https://github.com/verl-project/verl/tree/main/examples/ppo_trainer>`_ directory.
