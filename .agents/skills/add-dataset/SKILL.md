@@ -1,11 +1,11 @@
 ---
 name: add-dataset
-description: Guide for adding a new dataset to veRL. Use when user wants to preprocess or integrate a new RL training dataset.
+description: Guide for adding a new dataset to verl. Use when user wants to preprocess or integrate a new RL training dataset.
 ---
 
 # Add Dataset
 
-Add a new dataset for RL training in veRL.
+Add a new dataset for RL training in verl.
 
 ## When to Use
 
@@ -17,7 +17,7 @@ This skill is triggered when:
 
 ## Overview
 
-veRL datasets follow a two-step pattern:
+verl datasets follow a two-step pattern:
 
 1. **Preprocessing script** (`examples/data_preprocess/<name>.py`): run once offline to
    convert raw data into parquet files with a fixed schema
@@ -164,7 +164,7 @@ See the `/add-reward` skill for details.
 ## Key Requirements
 
 1. **Fixed schema**: All required fields must be present (see above)
-2. **Parquet format**: veRL's `RLHFDataset` expects `.parquet` files
+2. **Parquet format**: verl's `RLHFDataset` expects `.parquet` files
 3. **data_source matches**: Must align with your reward function's dispatch key
 4. **Prompt as chat messages**: Use list-of-dicts format, not a raw string
 

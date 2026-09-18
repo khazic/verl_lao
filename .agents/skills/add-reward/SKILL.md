@@ -1,11 +1,11 @@
 ---
 name: add-reward
-description: Guide for adding a new reward function to veRL. Use when user wants to create a reward (compute_score) function.
+description: Guide for adding a new reward function to verl. Use when user wants to create a reward (compute_score) function.
 ---
 
 # Add Reward
 
-Add a new reward function to veRL.
+Add a new reward function to verl.
 
 ## When to Use
 
@@ -58,7 +58,7 @@ import re
 from typing import Any
 
 
-def compute_score(data_source: str, solution_str: str, ground_truth: Any, extra_info=None) -> float:
+def compute_score(data_source: str, solution_str: str, ground_truth: Any, extra_info=None, **kwargs) -> float:
     """Compute reward score for a single completion.
 
     Args:
@@ -67,6 +67,9 @@ def compute_score(data_source: str, solution_str: str, ground_truth: Any, extra_
         ground_truth: Ground truth answer from the dataset.
         extra_info: Per-sample dict; Reward Loop also injects `num_turns` and
             `rollout_reward_scores`.
+        **kwargs: Keep this. The reward manager passes extra keyword arguments in
+            some setups (`reward_router_address` and `reward_model_tokenizer` when a
+            reward router is configured), and a closed signature raises TypeError.
 
     Returns:
         Float score, typically in [0.0, 1.0]. A dict with a `score` key is also

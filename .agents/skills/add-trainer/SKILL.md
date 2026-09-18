@@ -1,23 +1,23 @@
 ---
 name: add-trainer
-description: Guide for adding a new RL trainer recipe to veRL. Use when user wants to implement a new algorithm or training recipe.
+description: Guide for adding a new RL trainer recipe to verl. Use when user wants to implement a new algorithm or training recipe.
 ---
 
 # Add Trainer
 
-Add a new RL training recipe (algorithm variant) to veRL.
+Add a new RL training recipe (algorithm variant) to verl.
 
 ## When to Use
 
 This skill is triggered when:
 
 - User asks "how do I implement a new algorithm?"
-- User wants to add a new trainer on top of veRL's worker infrastructure
+- User wants to add a new trainer on top of verl's worker infrastructure
 - User mentions creating a new `recipe/` entry or trainer script
 
 ## Overview
 
-veRL follows a **single-controller + Ray workers** architecture:
+verl follows a **single-controller + Ray workers** architecture:
 
 ```
 Your Trainer Script (controller, CPU node)
@@ -103,6 +103,39 @@ class MyTrainer(RayPPOTrainer):
             # ... custom loop logic
 ```
 
+`python3 -m verl.trainer.main_ppo` never sees this class: its TaskRunner
+instantiates the stock trainer. A subclass needs its own entry point, the way
+`verl/experimental/one_step_off_policy/main_ppo.py` does it: subclass the
+TaskRunner so `run()` builds `MyTrainer`, then reuse `run_ppo` for the Ray setup.
+
+```python
+# recipe/<name>/main_<name>.py
+import hydra
+import ray
+
+from verl.trainer.main_ppo import TaskRunnerV1, run_ppo
+
+
+@ray.remote
+class MyTaskRunner(TaskRunnerV1):
+    def run(self, config):
+        # Same body as TaskRunnerV1.run, with `MyTrainer(config=config)` in
+        # place of the trainer class it looks up.
+        ...
+
+
+@hydra.main(config_path="config", config_name="<name>_trainer", version_base=None)
+def main(config):
+    run_ppo(config, task_runner_class=MyTaskRunner)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+The run script for Option B then calls `python3 -m recipe.<name>.main_<name>`
+instead of `verl.trainer.main_ppo`.
+
 ### Step 4: Write Run Script
 
 **Option A**: custom advantage estimator: import your module first so
@@ -137,7 +170,7 @@ main()
 
 ### Step 5: Key DataProto Fields
 
-`DataProto` is veRL's data container. Common fields in the batch:
+`DataProto` is verl's data container. Common fields in the batch:
 
 | Field                      | Shape              | Description                            |
 | -------------------------- | ------------------ | -------------------------------------- |
@@ -154,7 +187,7 @@ main()
 
 ### Step 6: Core Algorithm Utilities
 
-veRL provides registered advantage estimators and policy loss functions:
+verl provides registered advantage estimators and policy loss functions:
 
 ```python
 from verl.trainer.ppo.core_algos import get_adv_estimator_fn, register_adv_est
