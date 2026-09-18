@@ -155,44 +155,104 @@ def _packed_causal_conv1d_fallback(
     return torch.cat(outputs, dim=-1)
 
 
+# Where each optional fast kernel really lives. transformers wraps these behind
+# decorated module-scope functions that fall back to a torch reference when the
+# package is missing; resolving the package directly is how this file tells a
+# real kernel from that reference.
+_FAST_KERNELS = {
+    "chunk_gated_delta_rule": ("fla.ops.gated_delta_rule", "chunk_gated_delta_rule"),
+    "recurrent_gated_delta_rule": ("fla.ops.gated_delta_rule", "fused_recurrent_gated_delta_rule"),
+    "causal_conv1d_fn": ("causal_conv1d", "causal_conv1d_fn"),
+    "causal_conv1d_update": ("causal_conv1d", "causal_conv1d_update"),
+}
+
+# The torch reference each rule falls back to, by the name transformers gives it.
+_REFERENCE_DELTA_RULES = {
+    "chunk_gated_delta_rule": "torch_chunk_gated_delta_rule",
+    "recurrent_gated_delta_rule": "torch_recurrent_gated_delta_rule",
+}
+
+
+def _fast_kernel(name):
+    module_name, attr = _FAST_KERNELS[name]
+    try:
+        return getattr(import_module(module_name), attr, None)
+    except ImportError:
+        return None
+
+
+def _reference_delta_rule(torch_fn):
+    """Wrap a transformers torch reference behind a closed signature.
+
+    The decorated reference takes `**kwargs` and drops what it does not know, so
+    introspecting it says `cu_seqlens` and `cp_context` are accepted when they are
+    in fact ignored: packed examples would then be processed as one continuous
+    sequence. A closed signature makes `_call_accepts_kwarg` answer no, which sends
+    the packed path through the per-sequence split loop instead.
+    """
+
+    def reference(
+        query, key, value, g, beta, initial_state=None, output_final_state=False, use_qk_l2norm_in_kernel=False
+    ):
+        return torch_fn(
+            query,
+            key,
+            value,
+            g=g,
+            beta=beta,
+            initial_state=initial_state,
+            output_final_state=output_final_state,
+            use_qk_l2norm_in_kernel=use_qk_l2norm_in_kernel,
+        )
+
+    reference.__name__ = reference.__qualname__ = f"reference_{torch_fn.__name__}"
+    return reference
+
+
 def _delta_net_kernel(module, name):
     """Resolve a gated-delta-net kernel however the installed stack exposes it.
 
-    Older transformers releases bound these on the GatedDeltaNet instance. Current
-    ones define them at module scope, the two rules behind a `torch_` prefix and a
-    decorator that dispatches to FLA when it is installed.
+    Older transformers releases bound these on the GatedDeltaNet instance, already
+    resolved to the fast kernel, the torch reference, or None. Current ones only
+    define decorated module-scope wrappers, so the resolution happens here:
 
-    FLA's own function is preferred over that decorated wrapper on purpose. The
-    wrapper does call FLA, but it re-exports the torch fallback's signature, and
-    this file decides what it may pass by inspecting the signature: through the
-    wrapper `cu_seqlens` and `cp_context` look unsupported, which silently costs
-    the packed-sequence fast path and makes ulysses sequence parallelism raise
-    NotImplementedError on a stack that in fact supports it.
+    1. the instance attribute, when present;
+    2. the fast kernel straight from its package (FLA, causal-conv1d). The
+       decorated transformers wrapper does dispatch to it, but re-exports the torch
+       reference's signature, which hides `cu_seqlens` and `cp_context` from the
+       callers that introspect it;
+    3. otherwise the slow path this file already carries: None for
+       `causal_conv1d_fn` (its callers run the per-sequence conv1d), the delta
+       rules' torch reference behind a closed signature, and transformers' own
+       torch `causal_conv1d_update`.
     """
-    fn = getattr(module, name, None)
+    if name not in _FAST_KERNELS:
+        raise AttributeError(
+            f"{name} is not a delta-net kernel this file knows about; expected one of {sorted(_FAST_KERNELS)}."
+        )
+
+    if hasattr(module, name):
+        return getattr(module, name)
+
+    fn = _fast_kernel(name)
     if fn is not None:
         return fn
 
-    if name in ("chunk_gated_delta_rule", "recurrent_gated_delta_rule"):
-        try:
-            import fla.ops.gated_delta_rule as fla_ops
-
-            fla_fn = getattr(fla_ops, name, None)
-            if fla_fn is not None:
-                return fla_fn
-        except ImportError:
-            pass
+    if name == "causal_conv1d_fn":
+        return None
 
     from transformers.models.qwen3_5 import modeling_qwen3_5 as hf_qwen3_5
 
-    fn = getattr(hf_qwen3_5, name, None) or getattr(hf_qwen3_5, f"torch_{name}", None)
-    if fn is None:
-        raise AttributeError(
-            f"{type(module).__name__} has no {name}, and transformers exposes neither "
-            f"{name} nor torch_{name} at module scope. This file and the installed "
-            "transformers disagree about where the delta-net kernels live."
-        )
-    return fn
+    if name == "causal_conv1d_update":
+        # transformers 5.x keeps the torch reference under a `torch_` prefix and
+        # sets the bare name to None when causal-conv1d is missing; on main the
+        # bare name is the decorated wrapper that falls back on its own.
+        fn = getattr(hf_qwen3_5, "torch_causal_conv1d_update", None) or hf_qwen3_5.causal_conv1d_update
+        if fn is None:
+            raise AttributeError("transformers exposes no torch causal_conv1d_update reference at module scope.")
+        return fn
+
+    return _reference_delta_rule(getattr(hf_qwen3_5, _REFERENCE_DELTA_RULES[name]))
 
 
 def _packed_chunk_gated_delta_rule(self, query, key, value, g, beta, cu_seqlens, cu_seqlens_cpu, cp_context=None):
